@@ -1,0 +1,22 @@
+name: "Anncsu Update"
+description: "GitHub Action to update Anncsu using anncsy-sdk starting from geodiff report file."
+author: "Luigi Pirelli"
+branding:
+  icon: "map"
+  color: "blue"
+
+inputs:
+  geodiff-report:
+    description: "Path to the Geodiff report file."
+    required: true
+  token:
+    description: "GitHub Token"
+    default: ${{ github.token }}
+
+outputs:
+  anncsu-update-output:
+    description: "Report returned by anncsu-sdk after updating Anncsu."
+
+runs:
+  using: "docker"
+  image: "Dockerfile"

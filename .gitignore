@@ -1,0 +1,19 @@
+.idea/
+*.iml
+.vscode/
+.venv/
+venv/
+__pycache__/
+*.egg-info/
+build/
+dist/
+*.log
+*.pyc
+.coverage
+coverage.xml
+.env
+.secrets
+.vars
+# pixi environments
+.pixi/*
+!.pixi/config.toml
