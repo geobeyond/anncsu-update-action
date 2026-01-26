@@ -62,7 +62,7 @@ def _call_anncsu_api_for_entry(entry, token: str) -> bool:
         elif action == "delete":
             core.info(f"(placeholder) Delete {len(entry.changes)} values from {table}")
         else:
-            core.warning(f"Unknown action type: {action}")
+            core.warn(f"Unknown action type: {action}")
             return False
         return True
     except Exception as exc:  # pragma: no cover - defensive
@@ -98,7 +98,7 @@ for entry in geodiff_obj.geodiff:
 
 success = all(r for _, r in results)
 if not success:
-    core.warning("One or more ANNCSU API calls failed (see logs)")
+    core.warn("One or more ANNCSU API calls failed (see logs)")
 
 # Track temp files for cleanup
 temp_files_to_cleanup: list[str] = []
