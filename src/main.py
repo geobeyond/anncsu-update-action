@@ -11,6 +11,21 @@ from pathlib import Path
 
 from actions import context, core
 
+# ANNCSU API related imports
+from anncsu.pa import Anncsu
+from anncsu.common import (
+    # Step 1: Client Assertion
+    ClientAssertionConfig,
+    create_client_assertion,
+    # Step 2: Token Exchange
+    TokenConfig,
+    get_access_token,
+    # Step 3: API Authentication
+    Security,
+)
+from anncsu.common.config import ClientAssertionSettings
+from anncsu.common.pdnd_assertion import create_client_assertion
+
 import functions
 from geodiff_models import GeodiffFile
 
@@ -43,7 +58,7 @@ with core.group("GitHub Context Data"):
 core.info("Update ANNCU DB from geodiff report...")
 
 
-def _call_anncsu_api_for_entry(entry, token: str) -> bool:
+def _call_anncsu_api_for_entry(entry, anncsu_client: Anncsu) -> bool:
     """Placeholder to call the ANNCSU API for a single GeodiffEntry.
 
     This function should be replaced with the real integration. For now it
@@ -90,18 +105,50 @@ if geodiff_obj is None:
     core.set_failed("Could not load or validate geodiff report; aborting")
     raise SystemExit(1)
 
-# Dispatch entries to ANNCSU API handlers
-results = []
-for entry in geodiff_obj.geodiff:
-    ok = _call_anncsu_api_for_entry(entry, token)
-    results.append((entry.type, ok))
+# then authenticate with ANNCSU API
+core.info("Authenticating with ANNCSU API...")
+try:
+    # Step 1: Create client assertion (JWT)
+    settings = ClientAssertionSettings()  # Loads from env/.env
+    assertion_config = settings.to_config()
+    client_assertion = create_client_assertion(assertion_config)
 
-success = all(r for _, r in results)
-if not success:
-    core.warn("One or more ANNCSU API calls failed (see logs)")
+    # Step 2: Exchange for access token
+    token_config = TokenConfig(
+        client_id=settings.issuer,
+        client_assertion=client_assertion,
+        token_endpoint=settings.audience,
+    )
+    token_response = get_access_token(token_config)
 
-# Track temp files for cleanup
-temp_files_to_cleanup: list[str] = []
+    # Step 3: Use access token for API calls
+    security = Security(bearer=token_response.access_token)
+except Exception as exc:
+    core.set_failed(f"Failed to authenticate with ANNCSU API: {exc}")
+    raise SystemExit(1) from exc
+
+# instantiate anncsu sdk client
+core.info("Instantiating ANNCSU SDK client...")
+try:
+    with Anncsu(security=security) as anncsu_client:
+        core.info("ANNCSU SDK client instantiated successfully")
+
+        # Dispatch entries to ANNCSU API handlers
+        results = []
+        for entry in geodiff_obj.geodiff:
+            ok = _call_anncsu_api_for_entry(entry, anncsu_client)
+            results.append((entry.type, ok))
+
+        success = all(r for _, r in results)
+        if not success:
+            core.warn("One or more ANNCSU API calls failed (see logs)")
+
+        # Track temp files for cleanup
+        temp_files_to_cleanup: list[str] = []
+
+except Exception as exc:
+    core.set_failed(f"Failed to instantiate ANNCSU SDK client: {exc}")
+    raise SystemExit(1) from exc
 
 # Initialize variables
 
