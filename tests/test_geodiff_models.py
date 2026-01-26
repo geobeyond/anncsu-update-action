@@ -1,4 +1,3 @@
-import os
 import sys
 from pathlib import Path
 
@@ -10,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
 sys.path.insert(0, str(SRC))
 
-from geodiff_models import GeodiffFile, validate_examples_from_strings
+from geodiff_models import GeodiffFile, validate_examples_from_strings  # noqa: E402 (because nee to import after path insert)
 # JSON example fixtures moved to tests/conftest.py as pytest fixtures:
 # - geodiff_delete_json
 # - geodiff_update_json
@@ -59,7 +58,7 @@ def test_write_entry_type_schemas_and_validate(temp_dir):
         assert p.exists()
         data = json.loads(p.read_text(encoding="utf-8"))
         # top-level title includes the type
-        assert data.get("title") == f"GeodiffEntry"
+        assert data.get("title") == "GeodiffEntry"
 
 
 def test_validate_examples_from_strings(geodiff_delete_json, geodiff_update_json, geodiff_insert_json):

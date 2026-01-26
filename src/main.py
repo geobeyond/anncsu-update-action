@@ -15,7 +15,6 @@ import functions
 from geodiff_models import GeodiffFile
 
 
-
 version: str = core.get_version()
 core.info(f"Starting Anncsu Update Action - \033[32;1m{version}")
 

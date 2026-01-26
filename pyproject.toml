@@ -3,7 +3,7 @@
 name = "anncsu-update-action"
 version = "0.1.0"
 description = "GitHub Action to update ANNCSU db via openapi using anncsu-sdk"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 classifiers = ["Private :: Do Not Upload"]
 dependencies = [
   "actions-tools[github]",
