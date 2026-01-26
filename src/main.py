@@ -15,7 +15,7 @@ from actions import context, core
 from anncsu.pa import Anncsu
 from anncsu.common import (
     # Step 1: Client Assertion
-    ClientAssertionConfig,
+    ClientAssertionSettings,
     create_client_assertion,
     # Step 2: Token Exchange
     TokenConfig,
@@ -23,8 +23,6 @@ from anncsu.common import (
     # Step 3: API Authentication
     Security,
 )
-from anncsu.common.config import ClientAssertionSettings
-from anncsu.common.pdnd_assertion import create_client_assertion
 
 import functions
 from geodiff_models import GeodiffFile
