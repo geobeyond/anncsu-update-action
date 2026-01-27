@@ -12,17 +12,18 @@ from pathlib import Path
 from actions import context, core
 
 # ANNCSU API related imports
-from anncsu.pa import Anncsu
-from anncsu.common import (
-    # Step 1: Client Assertion
-    ClientAssertionSettings,
-    create_client_assertion,
-    # Step 2: Token Exchange
-    TokenConfig,
-    get_access_token,
-    # Step 3: API Authentication
-    Security,
-)
+from anncsu.pa import AnncsuConsultazione as Anncsu
+
+# Step 1: Client Assertion
+from anncsu.common.config import ClientAssertionSettings, APIType
+from anncsu.common import create_client_assertion
+
+# Step 2: Token Exchange
+from anncsu.common import PDNDAuthManager
+from anncsu.common.session import get_config_dir
+
+# Step 3: API Authentication
+from anncsu.coordinate.models import Security
 
 import functions
 from geodiff_models import GeodiffFile
@@ -108,19 +109,22 @@ core.info("Authenticating with ANNCSU API...")
 try:
     # Step 1: Create client assertion (JWT)
     settings = ClientAssertionSettings()  # Loads from env/.env
-    assertion_config = settings.to_config()
-    client_assertion = create_client_assertion(assertion_config)
+    accessi_config = settings.to_config(APIType.ACCESSI)
+    client_assertion = create_client_assertion(accessi_config)
 
     # Step 2: Exchange for access token
-    token_config = TokenConfig(
-        client_id=settings.issuer,
-        client_assertion=client_assertion,
-        token_endpoint=settings.audience,
+    manager = PDNDAuthManager(
+        settings=settings,
+        token_endpoint=accessi_config.audience,
+        api_type=APIType.ACCESSI,
+        session_persistence=True,
+        config_dir=get_config_dir(),
     )
-    token_response = get_access_token(token_config)
+    # Force token retrieval (will save session automatically)
+    access_token = manager.get_access_token()
 
     # Step 3: Use access token for API calls
-    security = Security(bearer=token_response.access_token)
+    security = Security(bearer=access_token)
 except Exception as exc:
     core.set_failed(f"Failed to authenticate with ANNCSU API: {exc}")
     raise SystemExit(1) from exc
