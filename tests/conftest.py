@@ -52,7 +52,7 @@ def fake_core(monkeypatch, tmp_path):
 
         def get_input(self, name, required=False):
             if name == "geodiff_report":
-                return 'a json to simulate geodiff report to be patched before test run'
+                return "a json to simulate geodiff report to be patched before test run"
             if name == "token":
                 return "fake-token"
             return ""
@@ -140,7 +140,9 @@ def fake_core(monkeypatch, tmp_path):
 
     return actions.core
 
+
 """Pytest configuration and fixtures for geodiff tests."""
+
 
 # reusing subset of conftest from geodiff-action codebase
 @pytest.fixture
