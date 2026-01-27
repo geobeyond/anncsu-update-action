@@ -46,7 +46,9 @@ jobs:
 
       - name: "ty"
         if: ${{ !cancelled() }}
-        run: uv run ty check src/
+        run: |
+          cp .env.example .env
+          uv run ty check src/
 
       - name: "Bandit security check"
         if: ${{ !cancelled() }}
