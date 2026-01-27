@@ -6,9 +6,9 @@ description = "GitHub Action to update ANNCSU db via openapi using anncsu-sdk"
 requires-python = ">=3.12"
 classifiers = ["Private :: Do Not Upload"]
 dependencies = [
-  "actions-tools[github]",
-  "anncsu-sdk>=0.0.5",
-  "pydantic>=2.9.0",
+  "actions-tools[github]>=0.3.0,<0.4",
+  "anncsu-sdk>=0.0.6,<0.0.7",
+  "pydantic>=2.12.5,<3",
 ]
 
 [dependency-groups]
