@@ -11,7 +11,7 @@ import pytest
 # Make the package source importable from tests
 sys.path.insert(0, "src")
 
-import functions as _functions
+import functions as _functions  # noqa: E402
 
 
 @pytest.fixture
