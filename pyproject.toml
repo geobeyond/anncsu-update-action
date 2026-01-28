@@ -9,6 +9,8 @@ dependencies = [
   "actions-tools[github]>=0.3.0,<0.4",
   "anncsu-sdk>=0.0.6,<0.0.7",
   "pydantic>=2.12.5,<3",
+  "typer>=0.15.0",
+  "rich>=13.0.0",
 ]
 
 [dependency-groups]
