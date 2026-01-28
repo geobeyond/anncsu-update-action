@@ -13,132 +13,72 @@ sys.path.insert(0, "src")
 
 import functions as _functions  # noqa: E402
 
+# a read geodiff modification report fixture
+@pytest.fixture
+def geodiff_real_value_update_json():
+    import json
+
+    # NOTE: PK are
+    # columns: 0: address_id (AKA PROGRESSIVO_ACCESSO)
+    # columns: 2: road_id (AKA PROGRESSIVO_NAZIONALE)
+    return json.dumps(
+        {
+        "geodiff": [
+                {
+                    "changes": [
+                        {
+                        "column": 0,
+                        "old": 28671617
+                        },
+                        {
+                        "column": 2,
+                        "old": 1222582
+                        },
+                        {
+                        "column": 6,
+                        "new": "4",
+                        "old": "44"
+                        }
+                    ],
+                    "table": "WhereAbouts_fails",
+                    "type": "update"
+                }
+            ]
+        }
+    )
 
 @pytest.fixture
-def fake_core(monkeypatch, tmp_path):
-    """Set up fake `actions` package and minimal `anncsu` modules.
+def geodiff_real_coord_update_json():
+    import json
 
-    Returns the `core` object so tests can inspect logged messages.
-    """
-    # Patch functions.check_output to avoid running external commands
-    monkeypatch.setattr(_functions, "check_output", lambda *a, **k: "")
-
-    # Fake `actions` package
-    actions = types.ModuleType("actions")
-    actions.context = types.SimpleNamespace(os="dummy", repo="x")
-
-    class DummyCore:
-        def __init__(self):
-            self.messages = []
-
-        def get_version(self):
-            return "0.0-test"
-
-        def info(self, msg):
-            self.messages.append(("info", msg))
-            print(f"INFO: {msg}")
-
-        def debug(self, msg):
-            self.messages.append(("debug", msg))
-            print(f"DEBUG: {msg}")
-
-        def warn(self, msg):
-            self.messages.append(("warn", msg))
-            print(f"WARN: {msg}")
-
-        def error(self, msg):
-            self.messages.append(("error", msg))
-            print(f"ERROR: {msg}")
-
-        def get_input(self, name, required=False):
-            if name == "geodiff_report":
-                return "a json to simulate geodiff report to be patched before test run"
-            if name == "token":
-                return "fake-token"
-            return ""
-
-        def set_failed(self, msg):
-            raise RuntimeError(msg)
-
-        def group(self, name):
-            return contextlib.nullcontext()
-
-    actions.core = DummyCore()
-
-    # Install the fake actions module
-    monkeypatch.setitem(sys.modules, "actions", actions)
-
-    # Create minimal fake `anncsu` package and submodules used by main
-    anncsu = types.ModuleType("anncsu")
-    pa = types.ModuleType("anncsu.pa")
-
-    class AnncsuConsultazione:
-        def __init__(self, security=None):
-            self.security = security
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, exc_type, exc, tb):
-            return False
-
-    pa.AnncsuConsultazione = AnncsuConsultazione
-    monkeypatch.setitem(sys.modules, "anncsu", anncsu)
-    monkeypatch.setitem(sys.modules, "anncsu.pa", pa)
-
-    # anncsu.common.config
-    common = types.ModuleType("anncsu.common")
-    common_config = types.ModuleType("anncsu.common.config")
-
-    class ClientAssertionSettings:
-        def to_config(self, api_type=None):
-            return types.SimpleNamespace(audience="https://token.endpoint")
-
-    class APIType:
-        ACCESSI = "accessi"
-
-    common_config.ClientAssertionSettings = ClientAssertionSettings
-    common_config.APIType = APIType
-    monkeypatch.setitem(sys.modules, "anncsu.common", common)
-    monkeypatch.setitem(sys.modules, "anncsu.common.config", common_config)
-
-    # anncsu.common functions
-    def create_client_assertion(config):
-        return "client_assertion"
-
-    class PDNDAuthManager:
-        def __init__(self, **kwargs):
-            pass
-
-        def get_access_token(self):
-            return "access-token-from-manager"
-
-    common.create_client_assertion = create_client_assertion
-    common.PDNDAuthManager = PDNDAuthManager
-    monkeypatch.setitem(sys.modules, "anncsu.common", common)
-
-    # anncsu.common.session
-    common_session = types.ModuleType("anncsu.common.session")
-
-    def get_config_dir():
-        return tmp_path
-
-    common_session.get_config_dir = get_config_dir
-    monkeypatch.setitem(sys.modules, "anncsu.common.session", common_session)
-
-    # anncsu.coordinate.models.Security
-    coord = types.ModuleType("anncsu.coordinate")
-    coord_models = types.ModuleType("anncsu.coordinate.models")
-
-    class Security:
-        def __init__(self, bearer=None):
-            self.bearer = bearer
-
-    coord_models.Security = Security
-    monkeypatch.setitem(sys.modules, "anncsu.coordinate", coord)
-    monkeypatch.setitem(sys.modules, "anncsu.coordinate.models", coord_models)
-
-    return actions.core
+    # NOTE: PK are
+    # columns: 0: address_id (AKA PROGRESSIVO_ACCESSO)
+    # columns: 2: road_id (AKA PROGRESSIVO_NAZIONALE)
+    return json.dumps(
+        {
+            "geodiff": [
+                {
+                    "changes": [
+                        {
+                        "column": 0,
+                        "old": 28671616
+                        },
+                        {
+                        "column": 1,
+                        "new": "R1AAAQAAAAABAQAAAAAAAICcwitAAAAAwInzREA=",
+                        "old": "R1AAAQAAAAABAQAAAObiXKWtwitAXt3+bojzREA="
+                        },
+                        {
+                        "column": 2,
+                        "old": 1222582
+                        }
+                    ],
+                    "table": "WhereAbouts_fails",
+                    "type": "update"
+                }
+            ]
+        }
+    )
 
 
 """Pytest configuration and fixtures for geodiff tests."""
