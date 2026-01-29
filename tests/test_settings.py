@@ -2,14 +2,14 @@ import sys
 from pathlib import Path
 
 import pytest
-
+from pydantic import ValidationError
 
 # Ensure src is on sys.path for imports
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
 sys.path.insert(0, str(SRC))
 
-from settings import AnncsuUpdateSettings, MissingKeyError  # noqa: E402
+from settings import AnncsuUpdateSettings  # noqa: E402
 
 
 def _write_env(tmp_path, content: str):
@@ -33,5 +33,5 @@ def test_empty_value_allowed(tmp_path, monkeypatch):
 def test_missing_key_raises(tmp_path, monkeypatch):
     # no .env file present -> should raise MissingKeyError
     monkeypatch.chdir(tmp_path)
-    with pytest.raises(MissingKeyError):
+    with pytest.raises(ValidationError):
         AnncsuUpdateSettings()

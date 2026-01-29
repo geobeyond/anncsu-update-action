@@ -49,12 +49,12 @@ def test_parse_insert(geodiff_insert_json):
     assert entry.changes[2].new == "my new point A"
 
 
-def test_write_entry_type_schemas_and_validate(temp_dir):
-    # write schemas to temp_dir
-    GeodiffFile.write_entry_type_schemas(temp_dir)
+def test_write_entry_type_schemas_and_validate(tmp_path):
+    # write schemas to tmp_path
+    GeodiffFile.write_entry_type_schemas(tmp_path)
     # ensure files exist
     for t in ("delete", "update", "insert"):
-        p = temp_dir / f"geodiff_entry_{t}_schema.json"
+        p = tmp_path / f"geodiff_entry_{t}_schema.json"
         assert p.exists()
         data = json.loads(p.read_text(encoding="utf-8"))
         # top-level title includes the type
@@ -75,16 +75,16 @@ def test_roundtrip_to_json(geodiff_insert_json):
     assert g.model_dump() == g2.model_dump()
 
 
-def test_from_path_and_from_json_text(temp_dir, geodiff_insert_json):
-    p = temp_dir / "example.json"
+def test_from_path_and_from_json_text(tmp_path, geodiff_insert_json):
+    p = tmp_path / "example.json"
     p.write_text(geodiff_insert_json, encoding="utf-8")
     g = GeodiffFile.from_path(p)
     assert isinstance(g, GeodiffFile)
     assert g.geodiff[0].type == "insert"
 
 
-def test_write_json_schema(temp_dir):
-    out = temp_dir / "geodiff_file_schema.json"
+def test_write_json_schema(tmp_path):
+    out = tmp_path / "geodiff_file_schema.json"
     GeodiffFile.write_json_schema(out)
     assert out.exists()
     data = json.loads(out.read_text(encoding="utf-8"))

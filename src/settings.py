@@ -9,14 +9,8 @@ variables or .env files using pydantic-settings.
 from __future__ import annotations
 from typing_extensions import Annotated
 
-from pydantic import Field, model_validator
+from pydantic import Field, model_validator, ValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
-
-class MissingKeyError(Exception):
-    """Exception raised when required ANNCSU_UPDATE_* variables are missing from .env."""
-
-    pass
 
 
 class AnncsuUpdateSettings(BaseSettings):
@@ -56,19 +50,19 @@ class AnncsuUpdateSettings(BaseSettings):
         None means the variable was never set, "" means it was set but empty.
 
         Raises:
-            MissingKeyError: If any required variable is not defined
+            ValidationError: If any required variable is not defined
         """
-        missing_vars = []
-        value = getattr(self, "ANNCSU_UPDATE_CODICE_COMUNE", None)
+        value = getattr(self, "codice_comune", None)
         # None means not defined at all, "" is valid (defined but empty)
         if value is None:
-            raise MissingKeyError(
+            raise ValidationError(
                 "Missing required environment variables in .env:\n"
                 + "\nANNCSU_UPDATE_CODICE_COMUNE"
                 + "\n\nAll nANNCSU_UPDATE_CODICE_COMUNE* variables must be present (can be empty)."
             )
 
         return self
+
 
 __all__ = [
     "AnncsuUpdateSettings",
