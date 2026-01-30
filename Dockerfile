@@ -1,7 +1,7 @@
 FROM debian:bookworm-slim
 
 LABEL org.opencontainers.image.source="https://github.com/luipir/anncsu-update-action"
-LABEL org.opencontainers.image.description="Anncsu Update Action - GitHub Action for extracting tables from DuckDB files"
+LABEL org.opencontainers.image.description="Anncsu Update Action - GitHub Action to update Anncsu database from geodiff reports"
 LABEL org.opencontainers.image.authors="luipir"
 
 # Install git for git history mode and all necessary packages for Python and uv
