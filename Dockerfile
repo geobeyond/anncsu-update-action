@@ -29,4 +29,4 @@ RUN uv sync --locked --no-dev
 
 COPY src /src
 ENV PATH="/.venv/bin:$PATH"
-ENTRYPOINT ["python", "/src/main.py"]
+ENTRYPOINT ["python", "/src/main_with_cli.py"]
