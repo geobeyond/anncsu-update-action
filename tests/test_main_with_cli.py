@@ -1,157 +1,727 @@
-import importlib
+"""Tests for main_with_cli module.
+
+These tests use dependency injection to test individual functions
+without requiring complex module mocking.
+"""
+
 import sys
 from pathlib import Path
-import typer.testing
+
+import pytest
+
+# Ensure src is on path
+ROOT = Path(__file__).resolve().parents[1]
+SRC = ROOT / "src"
+sys.path.insert(0, str(SRC))
+
 from geodiff_models import GeodiffFile
 
+# Import the module under test (now safe to import without side effects)
+from main_with_cli import (
+    Coordinates,
+    EntryResult,
+    decode_gpkg_geometry,
+    extract_coordinates_from_geometry,
+    parse_gpkg_to_coordinates,
+    extract_entry_data,
+    process_entry,
+    process_all_entries,
+    load_geodiff_report,
+    authenticate_cli,
+    run_action,
+)
 
-def test_main_with_report_as_file(
-    monkeypatch,
-    geodiff_real_coord_update_json,
-    make_fake_actions_module,
-    make_fake_settings_module,
-    make_fake_pygeodiff_and_shapely,
-    DummyCliRunner,
-    fake_functions_module,
-    tmp_path,
-):
-    # use provided fixture JSON with a valid geometry
-    geodiff_json = geodiff_real_coord_update_json
-    geodiff_report = tmp_path / "geodiff_report.json"
-    geodiff_report.write_text(geodiff_json, encoding="utf-8")
-
-    # insert src on path for imports
-    ROOT = Path(__file__).resolve().parents[1]
-    SRC = ROOT / "src"
-    sys.path.insert(0, str(SRC))
-
-    # inject fake modules to avoid side effects during import
-    monkeypatch.setitem(sys.modules, "actions", make_fake_actions_module(geodiff_report))
-    monkeypatch.setitem(sys.modules, "settings", make_fake_settings_module())
-    pygeodiff_mod, shapely_mod = make_fake_pygeodiff_and_shapely()
-    monkeypatch.setitem(sys.modules, "pygeodiff", pygeodiff_mod)
-    monkeypatch.setitem(sys.modules, "shapely", shapely_mod)
-    monkeypatch.setitem(sys.modules, "shapely.wkb", shapely_mod.wkb)
-    monkeypatch.setitem(sys.modules, "functions", fake_functions_module)
-    # stub typer.testing.CliRunner so CLI auth doesn't execute external code
-    monkeypatch.setattr(typer.testing, "CliRunner", DummyCliRunner)
-
-    # Now import the module under test; module-level code should run without side effects
-    # and exceptions
-    if "main_with_cli" in sys.modules:
-        del sys.modules["main_with_cli"]
-    importlib.import_module("main_with_cli")
+# Import mock classes for type hints (they're defined in conftest.py)
+# We need to import them here since we use them as type annotations
+sys.path.insert(0, str(ROOT / "tests"))
+from conftest import MockLogger, MockSettings, MockCliRunner, MockCliResult, MockGeoDiff, MockGeometry, MockPoint
 
 
-def test_main_with_report_as_json(
-    monkeypatch,
-    geodiff_real_coord_update_json,
-    make_fake_actions_module,
-    make_fake_settings_module,
-    make_fake_pygeodiff_and_shapely,
-    DummyCliRunner,
-    fake_functions_module,
-):
-    # use provided fixture JSON with a valid geometry
-    geodiff_json = geodiff_real_coord_update_json
-
-    # insert src on path for imports
-    ROOT = Path(__file__).resolve().parents[1]
-    SRC = ROOT / "src"
-    sys.path.insert(0, str(SRC))
-
-    # inject fake modules to avoid side effects during import
-    monkeypatch.setitem(sys.modules, "actions", make_fake_actions_module(geodiff_json))
-    monkeypatch.setitem(sys.modules, "settings", make_fake_settings_module())
-    pygeodiff_mod, shapely_mod = make_fake_pygeodiff_and_shapely()
-    monkeypatch.setitem(sys.modules, "pygeodiff", pygeodiff_mod)
-    monkeypatch.setitem(sys.modules, "shapely", shapely_mod)
-    monkeypatch.setitem(sys.modules, "shapely.wkb", shapely_mod.wkb)
-    monkeypatch.setitem(sys.modules, "functions", fake_functions_module)
-    # stub typer.testing.CliRunner so CLI auth doesn't execute external code
-    monkeypatch.setattr(typer.testing, "CliRunner", DummyCliRunner)
-
-    # Now import the module under test; module-level code should run without side effects
-    # and exceptions
-    if "main_with_cli" in sys.modules:
-        del sys.modules["main_with_cli"]
-    importlib.import_module("main_with_cli")
+# ============================================================================
+# Tests for Coordinates and EntryResult dataclasses
+# ============================================================================
 
 
-def test_call_anncsu_cli_for_entry_success(
-    monkeypatch,
-    geodiff_real_coord_update_json,
-    make_fake_actions_module,
-    make_fake_settings_module,
-    make_fake_pygeodiff_and_shapely,
-    DummyCliRunner,
-    fake_functions_module,
-):
-    # use provided fixture JSON with a valid geometry
-    geodiff_json = geodiff_real_coord_update_json
+class TestDataClasses:
+    def test_coordinates_creation(self):
+        coords = Coordinates(x=12.34, y=56.78)
+        assert coords.x == 12.34
+        assert coords.y == 56.78
 
-    # insert src on path for imports
-    ROOT = Path(__file__).resolve().parents[1]
-    SRC = ROOT / "src"
-    sys.path.insert(0, str(SRC))
+    def test_entry_result_success(self):
+        result = EntryResult(entry_type="update", success=True)
+        assert result.entry_type == "update"
+        assert result.success is True
+        assert result.error_message is None
 
-    # inject fake modules to avoid side effects during import
-    monkeypatch.setitem(sys.modules, "actions", make_fake_actions_module(geodiff_json))
-    monkeypatch.setitem(sys.modules, "settings", make_fake_settings_module())
-    pygeodiff_mod, shapely_mod = make_fake_pygeodiff_and_shapely()
-    monkeypatch.setitem(sys.modules, "pygeodiff", pygeodiff_mod)
-    monkeypatch.setitem(sys.modules, "shapely", shapely_mod)
-    monkeypatch.setitem(sys.modules, "shapely.wkb", shapely_mod.wkb)
-    monkeypatch.setitem(sys.modules, "functions", fake_functions_module)
-    # stub typer.testing.CliRunner so CLI auth doesn't execute external code
-    monkeypatch.setattr(typer.testing, "CliRunner", DummyCliRunner)
-
-    # Now import the module under test; module-level code should run without side effects
-    if "main_with_cli" in sys.modules:
-        del sys.modules["main_with_cli"]
-    mod = importlib.import_module("main_with_cli")
-
-    # construct a synthetic entry to call the function directly from fixture
-    geodiffReport = GeodiffFile.from_json_text(geodiff_json)
-    entry = geodiffReport.geodiff[0]
-
-    result = mod._call_anncsu_cli_for_entry(entry)
-    assert result is True
+    def test_entry_result_failure(self):
+        result = EntryResult(entry_type="delete", success=False, error_message="Failed")
+        assert result.entry_type == "delete"
+        assert result.success is False
+        assert result.error_message == "Failed"
 
 
-def test_call_anncsu_cli_for_entry_missing_geometry(
-    monkeypatch,
-    geodiff_real_value_update_json,
-    make_fake_actions_module,
-    make_fake_settings_module,
-    make_fake_pygeodiff_and_shapely,
-    DummyCliRunner,
-    fake_functions_module,
-):
-    # use provided fixture JSON where geometry column may be absent
-    geodiff_json = geodiff_real_value_update_json
+# ============================================================================
+# Tests for geometry parsing functions
+# ============================================================================
 
-    ROOT = Path(__file__).resolve().parents[1]
-    SRC = ROOT / "src"
-    sys.path.insert(0, str(SRC))
 
-    monkeypatch.setitem(sys.modules, "actions", make_fake_actions_module(geodiff_json))
-    monkeypatch.setitem(sys.modules, "settings", make_fake_settings_module())
-    pygeodiff_mod, shapely_mod = make_fake_pygeodiff_and_shapely()
-    monkeypatch.setitem(sys.modules, "pygeodiff", pygeodiff_mod)
-    monkeypatch.setitem(sys.modules, "shapely", shapely_mod)
-    monkeypatch.setitem(sys.modules, "shapely.wkb", shapely_mod.wkb)
-    monkeypatch.setitem(sys.modules, "functions", fake_functions_module)
-    # stub typer.testing.CliRunner so CLI auth doesn't execute external code
-    monkeypatch.setattr(typer.testing, "CliRunner", DummyCliRunner)
+class TestGeometryParsing:
+    def test_decode_gpkg_geometry_success(self, mock_geodiff, mock_wkb_loader):
+        gpkg_base64 = "R1AAAQAAAAABAQAAAAAAAICcwitAAAAAwInzREA="
+        result = decode_gpkg_geometry(gpkg_base64, mock_geodiff, mock_wkb_loader)
 
-    if "main_with_cli" in sys.modules:
-        del sys.modules["main_with_cli"]
-    mod = importlib.import_module("main_with_cli")
+        # Check the geometry has expected attributes
+        assert result.is_valid
+        assert result.geom_type == "Point"
+        assert hasattr(result, "coords")
 
-    # build entry from fixture
-    geodiffReport = GeodiffFile.from_json_text(geodiff_json)
-    entry = geodiffReport.geodiff[0]
+    def test_decode_gpkg_geometry_invalid_base64(self, mock_geodiff, mock_wkb_loader):
+        with pytest.raises(Exception):  # base64.binascii.Error
+            decode_gpkg_geometry("not-valid-base64!!!", mock_geodiff, mock_wkb_loader)
 
-    result = mod._call_anncsu_cli_for_entry(entry)
-    assert result is False
+    def test_extract_coordinates_from_geometry_success(self, mock_point_class):
+        geometry = MockGeometry(is_valid=True, geom_type="Point", _coords=[(10.5, 20.5)])
+        coords = extract_coordinates_from_geometry(geometry, mock_point_class)
+
+        assert coords.x == 10.5
+        assert coords.y == 20.5
+
+    def test_extract_coordinates_from_geometry_invalid(self, mock_point_class):
+        geometry = MockGeometry(is_valid=False, geom_type="Point")
+
+        with pytest.raises(ValueError, match="Invalid geometry"):
+            extract_coordinates_from_geometry(geometry, mock_point_class)
+
+    def test_extract_coordinates_from_geometry_not_point(self, mock_point_class):
+        geometry = MockGeometry(is_valid=True, geom_type="LineString")
+
+        with pytest.raises(ValueError, match="Geometry is not a Point"):
+            extract_coordinates_from_geometry(geometry, mock_point_class)
+
+    def test_parse_gpkg_to_coordinates_success(self, mock_geodiff, mock_wkb_loader, mock_point_class):
+        gpkg_base64 = "R1AAAQAAAAABAQAAAAAAAICcwitAAAAAwInzREA="
+        coords = parse_gpkg_to_coordinates(gpkg_base64, mock_geodiff, mock_wkb_loader, mock_point_class)
+
+        assert isinstance(coords, Coordinates)
+        assert coords.x == 12.34
+        assert coords.y == 56.78
+
+
+# ============================================================================
+# Tests for entry data extraction
+# ============================================================================
+
+
+class TestExtractEntryData:
+    def test_extract_entry_data_update(self, geodiff_real_coord_update_json):
+        geodiff = GeodiffFile.from_json_text(geodiff_real_coord_update_json)
+        entry = geodiff.geodiff[0]
+
+        address_id, road_id, gpkg_geom = extract_entry_data(entry)
+
+        assert address_id == 28671616
+        assert road_id == 1222582
+        assert gpkg_geom == "R1AAAQAAAAABAQAAAAAAAICcwitAAAAAwInzREA="
+
+    def test_extract_entry_data_insert(self, geodiff_insert_json):
+        geodiff = GeodiffFile.from_json_text(geodiff_insert_json)
+        entry = geodiff.geodiff[0]
+
+        address_id, road_id, gpkg_geom = extract_entry_data(entry)
+
+        assert address_id == 4
+        assert gpkg_geom == "R1AAAeYQAAABAQAAAFyu1BOp6um/PoMqH8N01j8="
+
+    def test_extract_entry_data_no_geometry(self, geodiff_real_value_update_json):
+        geodiff = GeodiffFile.from_json_text(geodiff_real_value_update_json)
+        entry = geodiff.geodiff[0]
+
+        address_id, road_id, gpkg_geom = extract_entry_data(entry)
+
+        assert address_id == 28671617
+        assert road_id == 1222582
+        assert gpkg_geom is None
+
+
+# ============================================================================
+# Tests for process_entry function
+# ============================================================================
+
+
+class TestProcessEntry:
+    def test_process_entry_update_success(
+        self,
+        geodiff_real_coord_update_json,
+        mock_settings,
+        mock_cli_runner,
+        mock_cli_app,
+        mock_geodiff,
+        mock_wkb_loader,
+        mock_point_class,
+        mock_logger,
+    ):
+        geodiff = GeodiffFile.from_json_text(geodiff_real_coord_update_json)
+        entry = geodiff.geodiff[0]
+
+        result = process_entry(
+            entry=entry,
+            settings=mock_settings,
+            cli_runner=mock_cli_runner,
+            cli_app=mock_cli_app,
+            geodiff=mock_geodiff,
+            wkb_loader=mock_wkb_loader,
+            point_class=mock_point_class,
+            logger=mock_logger,
+        )
+
+        assert result is True
+        # Verify CLI was called
+        assert len(mock_cli_runner.invocations) == 1
+        app, args = mock_cli_runner.invocations[0]
+        assert "coordinate" in args
+        assert "update" in args
+        assert "--codcom" in args
+        assert "I501" in args
+
+    def test_process_entry_update_cli_failure(
+        self,
+        geodiff_real_coord_update_json,
+        mock_settings,
+        mock_cli_app,
+        mock_geodiff,
+        mock_wkb_loader,
+        mock_point_class,
+        mock_logger,
+    ):
+        # Create CLI runner that returns failure
+        cli_runner = MockCliRunner(result=MockCliResult(exit_code=1, output="Auth failed"))
+
+        geodiff = GeodiffFile.from_json_text(geodiff_real_coord_update_json)
+        entry = geodiff.geodiff[0]
+
+        result = process_entry(
+            entry=entry,
+            settings=mock_settings,
+            cli_runner=cli_runner,
+            cli_app=mock_cli_app,
+            geodiff=mock_geodiff,
+            wkb_loader=mock_wkb_loader,
+            point_class=mock_point_class,
+            logger=mock_logger,
+        )
+
+        assert result is False
+        # Check error was logged
+        error_messages = [msg for level, msg in mock_logger.messages if level == "error"]
+        assert any("failed" in msg.lower() for msg in error_messages)
+
+    def test_process_entry_missing_geometry(
+        self,
+        geodiff_real_value_update_json,
+        mock_settings,
+        mock_cli_runner,
+        mock_cli_app,
+        mock_geodiff,
+        mock_wkb_loader,
+        mock_point_class,
+        mock_logger,
+    ):
+        geodiff = GeodiffFile.from_json_text(geodiff_real_value_update_json)
+        entry = geodiff.geodiff[0]
+
+        result = process_entry(
+            entry=entry,
+            settings=mock_settings,
+            cli_runner=mock_cli_runner,
+            cli_app=mock_cli_app,
+            geodiff=mock_geodiff,
+            wkb_loader=mock_wkb_loader,
+            point_class=mock_point_class,
+            logger=mock_logger,
+        )
+
+        assert result is False
+        # Verify no CLI calls made
+        assert len(mock_cli_runner.invocations) == 0
+        # Check warning was logged
+        warn_messages = [msg for level, msg in mock_logger.messages if level == "warn"]
+        assert any("No geometry" in msg for msg in warn_messages)
+
+    def test_process_entry_insert_success(
+        self,
+        geodiff_insert_json,
+        mock_settings,
+        mock_cli_runner,
+        mock_cli_app,
+        mock_geodiff,
+        mock_wkb_loader,
+        mock_point_class,
+        mock_logger,
+    ):
+        geodiff = GeodiffFile.from_json_text(geodiff_insert_json)
+        entry = geodiff.geodiff[0]
+
+        result = process_entry(
+            entry=entry,
+            settings=mock_settings,
+            cli_runner=mock_cli_runner,
+            cli_app=mock_cli_app,
+            geodiff=mock_geodiff,
+            wkb_loader=mock_wkb_loader,
+            point_class=mock_point_class,
+            logger=mock_logger,
+        )
+
+        assert result is True
+        # Insert currently doesn't make CLI calls (TODO in code)
+        info_messages = [msg for level, msg in mock_logger.messages if level == "info"]
+        assert any("Insert" in msg for msg in info_messages)
+
+    def test_process_entry_delete_success(
+        self,
+        geodiff_delete_json,
+        mock_settings,
+        mock_cli_runner,
+        mock_cli_app,
+        mock_geodiff,
+        mock_wkb_loader,
+        mock_point_class,
+        mock_logger,
+    ):
+        geodiff = GeodiffFile.from_json_text(geodiff_delete_json)
+        entry = geodiff.geodiff[0]
+
+        result = process_entry(
+            entry=entry,
+            settings=mock_settings,
+            cli_runner=mock_cli_runner,
+            cli_app=mock_cli_app,
+            geodiff=mock_geodiff,
+            wkb_loader=mock_wkb_loader,
+            point_class=mock_point_class,
+            logger=mock_logger,
+        )
+
+        assert result is True
+        # Delete currently doesn't make CLI calls (TODO in code)
+        info_messages = [msg for level, msg in mock_logger.messages if level == "info"]
+        assert any("Delete" in msg for msg in info_messages)
+
+    def test_process_entry_invalid_geometry(
+        self,
+        geodiff_real_coord_update_json,
+        mock_settings,
+        mock_cli_runner,
+        mock_cli_app,
+        mock_geodiff,
+        mock_point_class,
+        mock_logger,
+    ):
+        # Create WKB loader that returns invalid geometry
+        def bad_wkb_loader(data):
+            return MockGeometry(is_valid=False)
+
+        geodiff = GeodiffFile.from_json_text(geodiff_real_coord_update_json)
+        entry = geodiff.geodiff[0]
+
+        result = process_entry(
+            entry=entry,
+            settings=mock_settings,
+            cli_runner=mock_cli_runner,
+            cli_app=mock_cli_app,
+            geodiff=mock_geodiff,
+            wkb_loader=bad_wkb_loader,
+            point_class=mock_point_class,
+            logger=mock_logger,
+        )
+
+        assert result is False
+        warn_messages = [msg for level, msg in mock_logger.messages if level == "warn"]
+        assert any("Geometry error" in msg for msg in warn_messages)
+
+    def test_process_entry_non_point_geometry(
+        self,
+        geodiff_real_coord_update_json,
+        mock_settings,
+        mock_cli_runner,
+        mock_cli_app,
+        mock_geodiff,
+        mock_point_class,
+        mock_logger,
+    ):
+        # Create WKB loader that returns LineString geometry
+        def linestring_wkb_loader(data):
+            return MockGeometry(is_valid=True, geom_type="LineString")
+
+        geodiff = GeodiffFile.from_json_text(geodiff_real_coord_update_json)
+        entry = geodiff.geodiff[0]
+
+        result = process_entry(
+            entry=entry,
+            settings=mock_settings,
+            cli_runner=mock_cli_runner,
+            cli_app=mock_cli_app,
+            geodiff=mock_geodiff,
+            wkb_loader=linestring_wkb_loader,
+            point_class=mock_point_class,
+            logger=mock_logger,
+        )
+
+        assert result is False
+        warn_messages = [msg for level, msg in mock_logger.messages if level == "warn"]
+        assert any("not a Point" in msg for msg in warn_messages)
+
+
+# ============================================================================
+# Tests for process_all_entries function
+# ============================================================================
+
+
+class TestProcessAllEntries:
+    def test_process_all_entries_multiple(
+        self,
+        geodiff_multiple_entries_json,
+        mock_settings,
+        mock_cli_runner,
+        mock_cli_app,
+        mock_geodiff,
+        mock_wkb_loader,
+        mock_point_class,
+        mock_logger,
+    ):
+        geodiff = GeodiffFile.from_json_text(geodiff_multiple_entries_json)
+
+        results = process_all_entries(
+            geodiff_file=geodiff,
+            settings=mock_settings,
+            cli_runner=mock_cli_runner,
+            cli_app=mock_cli_app,
+            geodiff=mock_geodiff,
+            wkb_loader=mock_wkb_loader,
+            point_class=mock_point_class,
+            logger=mock_logger,
+        )
+
+        assert len(results) == 3
+        assert results[0].entry_type == "update"
+        assert results[1].entry_type == "insert"
+        assert results[2].entry_type == "delete"
+        assert all(r.success for r in results)
+
+    def test_process_all_entries_empty(
+        self,
+        geodiff_empty_json,
+        mock_settings,
+        mock_cli_runner,
+        mock_cli_app,
+        mock_geodiff,
+        mock_wkb_loader,
+        mock_point_class,
+        mock_logger,
+    ):
+        geodiff = GeodiffFile.from_json_text(geodiff_empty_json)
+
+        results = process_all_entries(
+            geodiff_file=geodiff,
+            settings=mock_settings,
+            cli_runner=mock_cli_runner,
+            cli_app=mock_cli_app,
+            geodiff=mock_geodiff,
+            wkb_loader=mock_wkb_loader,
+            point_class=mock_point_class,
+            logger=mock_logger,
+        )
+
+        assert len(results) == 0
+
+    def test_process_all_entries_partial_failure(
+        self,
+        geodiff_multiple_entries_json,
+        mock_settings,
+        mock_cli_app,
+        mock_geodiff,
+        mock_point_class,
+        mock_logger,
+    ):
+        # CLI runner that fails on the second call (update operation)
+        cli_runner = MockCliRunner(
+            results_sequence=[
+                MockCliResult(exit_code=0, output="OK"),  # auth
+                MockCliResult(exit_code=1, output="Failed"),  # first update fails
+            ]
+        )
+
+        # WKB loader that returns invalid geometry for second entry
+        call_count = [0]
+
+        def selective_wkb_loader(data):
+            call_count[0] += 1
+            if call_count[0] == 2:  # Second entry
+                return MockGeometry(is_valid=False)
+            return MockGeometry()
+
+        geodiff = GeodiffFile.from_json_text(geodiff_multiple_entries_json)
+
+        results = process_all_entries(
+            geodiff_file=geodiff,
+            settings=mock_settings,
+            cli_runner=cli_runner,
+            cli_app=mock_cli_app,
+            geodiff=mock_geodiff,
+            wkb_loader=selective_wkb_loader,
+            point_class=mock_point_class,
+            logger=mock_logger,
+        )
+
+        assert len(results) == 3
+        # Second entry should fail
+        assert results[1].success is False
+
+
+# ============================================================================
+# Tests for load_geodiff_report function
+# ============================================================================
+
+
+class TestLoadGeodiffReport:
+    def test_load_from_file(self, tmp_path, geodiff_real_coord_update_json, mock_logger):
+        report_file = tmp_path / "report.json"
+        report_file.write_text(geodiff_real_coord_update_json)
+
+        result = load_geodiff_report(str(report_file), mock_logger)
+
+        assert result is not None
+        assert len(result.geodiff) == 1
+        assert result.geodiff[0].type == "update"
+
+    def test_load_from_json_text(self, geodiff_real_coord_update_json, mock_logger):
+        result = load_geodiff_report(geodiff_real_coord_update_json, mock_logger)
+
+        assert result is not None
+        assert len(result.geodiff) == 1
+
+    def test_load_invalid_json(self, mock_logger):
+        result = load_geodiff_report("not valid json", mock_logger)
+
+        assert result is None
+        error_messages = [msg for level, msg in mock_logger.messages if level == "error"]
+        assert len(error_messages) > 0
+
+    def test_load_nonexistent_file_fallback_to_json(self, mock_logger):
+        # Path doesn't exist, should try to parse as JSON
+        result = load_geodiff_report("/nonexistent/path.json", mock_logger)
+
+        assert result is None  # Invalid JSON
+
+    def test_load_file_with_invalid_json(self, tmp_path, mock_logger):
+        report_file = tmp_path / "bad_report.json"
+        report_file.write_text("not valid json content")
+
+        result = load_geodiff_report(str(report_file), mock_logger)
+
+        assert result is None
+        error_messages = [msg for level, msg in mock_logger.messages if level == "error"]
+        assert any("Failed to parse" in msg for msg in error_messages)
+
+
+# ============================================================================
+# Tests for authenticate_cli function
+# ============================================================================
+
+
+class TestAuthenticateCli:
+    def test_authenticate_success(self, mock_cli_runner, mock_cli_app, mock_logger):
+        result = authenticate_cli(mock_cli_runner, mock_cli_app, "pa", mock_logger)
+
+        assert result is True
+        assert len(mock_cli_runner.invocations) == 1
+        _, args = mock_cli_runner.invocations[0]
+        assert "auth" in args
+        assert "login" in args
+        assert "--api" in args
+        assert "pa" in args
+
+    def test_authenticate_failure(self, mock_cli_app, mock_logger):
+        cli_runner = MockCliRunner(result=MockCliResult(exit_code=1, output="Auth failed"))
+
+        result = authenticate_cli(cli_runner, mock_cli_app, "pa", mock_logger)
+
+        assert result is False
+        error_messages = [msg for level, msg in mock_logger.messages if level == "error"]
+        assert any("authentication failed" in msg.lower() for msg in error_messages)
+
+    def test_authenticate_exception(self, mock_cli_app, mock_logger):
+        class FailingCliRunner:
+            def invoke(self, app, args):
+                raise RuntimeError("Network error")
+
+        result = authenticate_cli(FailingCliRunner(), mock_cli_app, "pa", mock_logger)
+
+        assert result is False
+        error_messages = [msg for level, msg in mock_logger.messages if level == "error"]
+        assert any("Failed to authenticate" in msg for msg in error_messages)
+
+
+# ============================================================================
+# Tests for run_action function
+# ============================================================================
+
+
+class TestRunAction:
+    def test_run_action_success(
+        self,
+        geodiff_real_coord_update_json,
+        mock_settings,
+        mock_cli_runner,
+        mock_cli_app,
+        mock_geodiff,
+        mock_wkb_loader,
+        mock_point_class,
+        mock_logger,
+    ):
+        result = run_action(
+            geodiff_report=geodiff_real_coord_update_json,
+            settings=mock_settings,
+            cli_runner=mock_cli_runner,
+            cli_app=mock_cli_app,
+            geodiff=mock_geodiff,
+            wkb_loader=mock_wkb_loader,
+            point_class=mock_point_class,
+            logger=mock_logger,
+        )
+
+        assert result is True
+        assert mock_logger.failed_message is None
+        # Should have auth + update calls
+        assert len(mock_cli_runner.invocations) >= 2
+
+    def test_run_action_invalid_report(
+        self,
+        mock_settings,
+        mock_cli_runner,
+        mock_cli_app,
+        mock_geodiff,
+        mock_wkb_loader,
+        mock_point_class,
+        mock_logger,
+    ):
+        result = run_action(
+            geodiff_report="invalid json",
+            settings=mock_settings,
+            cli_runner=mock_cli_runner,
+            cli_app=mock_cli_app,
+            geodiff=mock_geodiff,
+            wkb_loader=mock_wkb_loader,
+            point_class=mock_point_class,
+            logger=mock_logger,
+        )
+
+        assert result is False
+        assert mock_logger.failed_message is not None
+        assert "geodiff report" in mock_logger.failed_message.lower()
+
+    def test_run_action_auth_failure(
+        self,
+        geodiff_real_coord_update_json,
+        mock_settings,
+        mock_cli_app,
+        mock_geodiff,
+        mock_wkb_loader,
+        mock_point_class,
+        mock_logger,
+    ):
+        cli_runner = MockCliRunner(result=MockCliResult(exit_code=1, output="Auth failed"))
+
+        result = run_action(
+            geodiff_report=geodiff_real_coord_update_json,
+            settings=mock_settings,
+            cli_runner=cli_runner,
+            cli_app=mock_cli_app,
+            geodiff=mock_geodiff,
+            wkb_loader=mock_wkb_loader,
+            point_class=mock_point_class,
+            logger=mock_logger,
+        )
+
+        assert result is False
+        assert mock_logger.failed_message is not None
+        assert "authenticate" in mock_logger.failed_message.lower()
+
+    def test_run_action_partial_entry_failure(
+        self,
+        geodiff_real_value_update_json,  # No geometry, will fail
+        mock_settings,
+        mock_cli_runner,
+        mock_cli_app,
+        mock_geodiff,
+        mock_wkb_loader,
+        mock_point_class,
+        mock_logger,
+    ):
+        result = run_action(
+            geodiff_report=geodiff_real_value_update_json,
+            settings=mock_settings,
+            cli_runner=mock_cli_runner,
+            cli_app=mock_cli_app,
+            geodiff=mock_geodiff,
+            wkb_loader=mock_wkb_loader,
+            point_class=mock_point_class,
+            logger=mock_logger,
+        )
+
+        assert result is False
+        warn_messages = [msg for level, msg in mock_logger.messages if level == "warn"]
+        assert any("failed" in msg.lower() for msg in warn_messages)
+
+    def test_run_action_with_file(
+        self,
+        tmp_path,
+        geodiff_real_coord_update_json,
+        mock_settings,
+        mock_cli_runner,
+        mock_cli_app,
+        mock_geodiff,
+        mock_wkb_loader,
+        mock_point_class,
+        mock_logger,
+    ):
+        report_file = tmp_path / "report.json"
+        report_file.write_text(geodiff_real_coord_update_json)
+
+        result = run_action(
+            geodiff_report=str(report_file),
+            settings=mock_settings,
+            cli_runner=mock_cli_runner,
+            cli_app=mock_cli_app,
+            geodiff=mock_geodiff,
+            wkb_loader=mock_wkb_loader,
+            point_class=mock_point_class,
+            logger=mock_logger,
+        )
+
+        assert result is True
+
+    def test_run_action_empty_geodiff(
+        self,
+        geodiff_empty_json,
+        mock_settings,
+        mock_cli_runner,
+        mock_cli_app,
+        mock_geodiff,
+        mock_wkb_loader,
+        mock_point_class,
+        mock_logger,
+    ):
+        result = run_action(
+            geodiff_report=geodiff_empty_json,
+            settings=mock_settings,
+            cli_runner=mock_cli_runner,
+            cli_app=mock_cli_app,
+            geodiff=mock_geodiff,
+            wkb_loader=mock_wkb_loader,
+            point_class=mock_point_class,
+            logger=mock_logger,
+        )
+
+        assert result is True  # Empty is success (nothing to do)
