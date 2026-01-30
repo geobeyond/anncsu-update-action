@@ -4,17 +4,10 @@ These tests use dependency injection to test individual functions
 without requiring complex module mocking.
 """
 
-import sys
-from pathlib import Path
-
+import binascii
 import pytest
 
-# Ensure src is on path
-ROOT = Path(__file__).resolve().parents[1]
-SRC = ROOT / "src"
-sys.path.insert(0, str(SRC))
-
-from geodiff_models import GeodiffFile
+from geodiff_models import GeodiffFile  # noqa: E402
 
 # Import the module under test (now safe to import without side effects)
 from main_with_cli import (
@@ -33,8 +26,8 @@ from main_with_cli import (
 
 # Import mock classes for type hints (they're defined in conftest.py)
 # We need to import them here since we use them as type annotations
-sys.path.insert(0, str(ROOT / "tests"))
-from conftest import MockLogger, MockSettings, MockCliRunner, MockCliResult, MockGeoDiff, MockGeometry, MockPoint
+# from conftest import MockLogger, MockSettings, MockCliRunner, MockCliResult, MockGeoDiff, MockGeometry, MockPoint
+from conftest import MockCliRunner, MockCliResult, MockGeometry
 
 
 # ============================================================================
@@ -77,7 +70,7 @@ class TestGeometryParsing:
         assert hasattr(result, "coords")
 
     def test_decode_gpkg_geometry_invalid_base64(self, mock_geodiff, mock_wkb_loader):
-        with pytest.raises(Exception):  # base64.binascii.Error
+        with pytest.raises(binascii.Error):  # base64.binascii.Error
             decode_gpkg_geometry("not-valid-base64!!!", mock_geodiff, mock_wkb_loader)
 
     def test_extract_coordinates_from_geometry_success(self, mock_point_class):
