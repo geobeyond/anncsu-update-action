@@ -73,28 +73,28 @@ class TestGeometryParsing:
         with pytest.raises(binascii.Error):  # base64.binascii.Error
             decode_gpkg_geometry("not-valid-base64!!!", mock_geodiff, mock_wkb_loader)
 
-    def test_extract_coordinates_from_geometry_success(self, mock_point_class):
+    def test_extract_coordinates_from_geometry_success(self):
         geometry = MockGeometry(is_valid=True, geom_type="Point", _coords=[(10.5, 20.5)])
-        coords = extract_coordinates_from_geometry(geometry, mock_point_class)
+        coords = extract_coordinates_from_geometry(geometry)
 
         assert coords.x == 10.5
         assert coords.y == 20.5
 
-    def test_extract_coordinates_from_geometry_invalid(self, mock_point_class):
+    def test_extract_coordinates_from_geometry_invalid(self):
         geometry = MockGeometry(is_valid=False, geom_type="Point")
 
         with pytest.raises(ValueError, match="Invalid geometry"):
-            extract_coordinates_from_geometry(geometry, mock_point_class)
+            extract_coordinates_from_geometry(geometry)
 
-    def test_extract_coordinates_from_geometry_not_point(self, mock_point_class):
+    def test_extract_coordinates_from_geometry_not_point(self):
         geometry = MockGeometry(is_valid=True, geom_type="LineString")
 
         with pytest.raises(ValueError, match="Geometry is not a Point"):
-            extract_coordinates_from_geometry(geometry, mock_point_class)
+            extract_coordinates_from_geometry(geometry)
 
-    def test_parse_gpkg_to_coordinates_success(self, mock_geodiff, mock_wkb_loader, mock_point_class):
+    def test_parse_gpkg_to_coordinates_success(self, mock_geodiff, mock_wkb_loader):
         gpkg_base64 = "R1AAAQAAAAABAQAAAAAAAICcwitAAAAAwInzREA="
-        coords = parse_gpkg_to_coordinates(gpkg_base64, mock_geodiff, mock_wkb_loader, mock_point_class)
+        coords = parse_gpkg_to_coordinates(gpkg_base64, mock_geodiff, mock_wkb_loader)
 
         assert isinstance(coords, Coordinates)
         assert coords.x == 12.34
@@ -151,7 +151,6 @@ class TestProcessEntry:
         mock_cli_app,
         mock_geodiff,
         mock_wkb_loader,
-        mock_point_class,
         mock_logger,
     ):
         geodiff = GeodiffFile.from_json_text(geodiff_real_coord_update_json)
@@ -164,7 +163,6 @@ class TestProcessEntry:
             cli_app=mock_cli_app,
             geodiff=mock_geodiff,
             wkb_loader=mock_wkb_loader,
-            point_class=mock_point_class,
             logger=mock_logger,
         )
 
@@ -184,7 +182,6 @@ class TestProcessEntry:
         mock_cli_app,
         mock_geodiff,
         mock_wkb_loader,
-        mock_point_class,
         mock_logger,
     ):
         # Create CLI runner that returns failure
@@ -200,7 +197,6 @@ class TestProcessEntry:
             cli_app=mock_cli_app,
             geodiff=mock_geodiff,
             wkb_loader=mock_wkb_loader,
-            point_class=mock_point_class,
             logger=mock_logger,
         )
 
@@ -217,7 +213,6 @@ class TestProcessEntry:
         mock_cli_app,
         mock_geodiff,
         mock_wkb_loader,
-        mock_point_class,
         mock_logger,
     ):
         geodiff = GeodiffFile.from_json_text(geodiff_real_value_update_json)
@@ -230,7 +225,6 @@ class TestProcessEntry:
             cli_app=mock_cli_app,
             geodiff=mock_geodiff,
             wkb_loader=mock_wkb_loader,
-            point_class=mock_point_class,
             logger=mock_logger,
         )
 
@@ -249,7 +243,6 @@ class TestProcessEntry:
         mock_cli_app,
         mock_geodiff,
         mock_wkb_loader,
-        mock_point_class,
         mock_logger,
     ):
         geodiff = GeodiffFile.from_json_text(geodiff_insert_json)
@@ -262,7 +255,6 @@ class TestProcessEntry:
             cli_app=mock_cli_app,
             geodiff=mock_geodiff,
             wkb_loader=mock_wkb_loader,
-            point_class=mock_point_class,
             logger=mock_logger,
         )
 
@@ -279,7 +271,6 @@ class TestProcessEntry:
         mock_cli_app,
         mock_geodiff,
         mock_wkb_loader,
-        mock_point_class,
         mock_logger,
     ):
         geodiff = GeodiffFile.from_json_text(geodiff_delete_json)
@@ -292,7 +283,6 @@ class TestProcessEntry:
             cli_app=mock_cli_app,
             geodiff=mock_geodiff,
             wkb_loader=mock_wkb_loader,
-            point_class=mock_point_class,
             logger=mock_logger,
         )
 
@@ -308,7 +298,6 @@ class TestProcessEntry:
         mock_cli_runner,
         mock_cli_app,
         mock_geodiff,
-        mock_point_class,
         mock_logger,
     ):
         # Create WKB loader that returns invalid geometry
@@ -325,7 +314,6 @@ class TestProcessEntry:
             cli_app=mock_cli_app,
             geodiff=mock_geodiff,
             wkb_loader=bad_wkb_loader,
-            point_class=mock_point_class,
             logger=mock_logger,
         )
 
@@ -340,7 +328,6 @@ class TestProcessEntry:
         mock_cli_runner,
         mock_cli_app,
         mock_geodiff,
-        mock_point_class,
         mock_logger,
     ):
         # Create WKB loader that returns LineString geometry
@@ -357,13 +344,48 @@ class TestProcessEntry:
             cli_app=mock_cli_app,
             geodiff=mock_geodiff,
             wkb_loader=linestring_wkb_loader,
-            point_class=mock_point_class,
             logger=mock_logger,
         )
 
         assert result is False
         warn_messages = [msg for level, msg in mock_logger.messages if level == "warn"]
         assert any("not a Point" in msg for msg in warn_messages)
+
+    def test_process_entry_unknown_action_type(
+        self,
+        mock_settings,
+        mock_cli_runner,
+        mock_cli_app,
+        mock_geodiff,
+        mock_wkb_loader,
+        mock_logger,
+    ):
+        # Create a mock entry with an unknown action type
+        # We bypass Pydantic validation to test defensive code
+        from types import SimpleNamespace
+
+        mock_change = SimpleNamespace(column=0, old=1001, new=None)
+        mock_geom_change = SimpleNamespace(column=1, old=None, new="R1AAAQAAAAABAQAAAAAAAICcwitAAAAAwInzREA=")
+        entry = SimpleNamespace(
+            type="unknown_action",
+            table="addresses",
+            changes=[mock_change, mock_geom_change],
+        )
+
+        result = process_entry(
+            entry=entry,  # type: ignore[arg-type]  # Intentionally bypassing Pydantic validation
+            settings=mock_settings,
+            cli_runner=mock_cli_runner,
+            cli_app=mock_cli_app,
+            geodiff=mock_geodiff,
+            wkb_loader=mock_wkb_loader,
+            logger=mock_logger,
+        )
+
+        assert result is False
+        # Check warning was logged about unknown action type
+        warn_messages = [msg for level, msg in mock_logger.messages if level == "warn"]
+        assert any("Unknown action type" in msg for msg in warn_messages)
 
 
 # ============================================================================
@@ -380,7 +402,6 @@ class TestProcessAllEntries:
         mock_cli_app,
         mock_geodiff,
         mock_wkb_loader,
-        mock_point_class,
         mock_logger,
     ):
         geodiff = GeodiffFile.from_json_text(geodiff_multiple_entries_json)
@@ -392,7 +413,6 @@ class TestProcessAllEntries:
             cli_app=mock_cli_app,
             geodiff=mock_geodiff,
             wkb_loader=mock_wkb_loader,
-            point_class=mock_point_class,
             logger=mock_logger,
         )
 
@@ -410,7 +430,6 @@ class TestProcessAllEntries:
         mock_cli_app,
         mock_geodiff,
         mock_wkb_loader,
-        mock_point_class,
         mock_logger,
     ):
         geodiff = GeodiffFile.from_json_text(geodiff_empty_json)
@@ -422,7 +441,6 @@ class TestProcessAllEntries:
             cli_app=mock_cli_app,
             geodiff=mock_geodiff,
             wkb_loader=mock_wkb_loader,
-            point_class=mock_point_class,
             logger=mock_logger,
         )
 
@@ -434,7 +452,6 @@ class TestProcessAllEntries:
         mock_settings,
         mock_cli_app,
         mock_geodiff,
-        mock_point_class,
         mock_logger,
     ):
         # CLI runner that fails on the second call (update operation)
@@ -463,7 +480,6 @@ class TestProcessAllEntries:
             cli_app=mock_cli_app,
             geodiff=mock_geodiff,
             wkb_loader=selective_wkb_loader,
-            point_class=mock_point_class,
             logger=mock_logger,
         )
 
@@ -570,7 +586,6 @@ class TestRunAction:
         mock_cli_app,
         mock_geodiff,
         mock_wkb_loader,
-        mock_point_class,
         mock_logger,
     ):
         result = run_action(
@@ -580,7 +595,6 @@ class TestRunAction:
             cli_app=mock_cli_app,
             geodiff=mock_geodiff,
             wkb_loader=mock_wkb_loader,
-            point_class=mock_point_class,
             logger=mock_logger,
         )
 
@@ -596,7 +610,6 @@ class TestRunAction:
         mock_cli_app,
         mock_geodiff,
         mock_wkb_loader,
-        mock_point_class,
         mock_logger,
     ):
         result = run_action(
@@ -606,7 +619,6 @@ class TestRunAction:
             cli_app=mock_cli_app,
             geodiff=mock_geodiff,
             wkb_loader=mock_wkb_loader,
-            point_class=mock_point_class,
             logger=mock_logger,
         )
 
@@ -621,7 +633,6 @@ class TestRunAction:
         mock_cli_app,
         mock_geodiff,
         mock_wkb_loader,
-        mock_point_class,
         mock_logger,
     ):
         cli_runner = MockCliRunner(result=MockCliResult(exit_code=1, output="Auth failed"))
@@ -633,7 +644,6 @@ class TestRunAction:
             cli_app=mock_cli_app,
             geodiff=mock_geodiff,
             wkb_loader=mock_wkb_loader,
-            point_class=mock_point_class,
             logger=mock_logger,
         )
 
@@ -649,7 +659,6 @@ class TestRunAction:
         mock_cli_app,
         mock_geodiff,
         mock_wkb_loader,
-        mock_point_class,
         mock_logger,
     ):
         result = run_action(
@@ -659,7 +668,6 @@ class TestRunAction:
             cli_app=mock_cli_app,
             geodiff=mock_geodiff,
             wkb_loader=mock_wkb_loader,
-            point_class=mock_point_class,
             logger=mock_logger,
         )
 
@@ -676,7 +684,6 @@ class TestRunAction:
         mock_cli_app,
         mock_geodiff,
         mock_wkb_loader,
-        mock_point_class,
         mock_logger,
     ):
         report_file = tmp_path / "report.json"
@@ -689,7 +696,6 @@ class TestRunAction:
             cli_app=mock_cli_app,
             geodiff=mock_geodiff,
             wkb_loader=mock_wkb_loader,
-            point_class=mock_point_class,
             logger=mock_logger,
         )
 
@@ -703,7 +709,6 @@ class TestRunAction:
         mock_cli_app,
         mock_geodiff,
         mock_wkb_loader,
-        mock_point_class,
         mock_logger,
     ):
         result = run_action(
@@ -713,7 +718,6 @@ class TestRunAction:
             cli_app=mock_cli_app,
             geodiff=mock_geodiff,
             wkb_loader=mock_wkb_loader,
-            point_class=mock_point_class,
             logger=mock_logger,
         )
 

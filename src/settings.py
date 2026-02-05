@@ -9,7 +9,7 @@ variables or .env files using pydantic-settings.
 from __future__ import annotations
 from typing_extensions import Annotated
 
-from pydantic import Field, model_validator, ValidationError
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -41,27 +41,6 @@ class AnncsuUpdateSettings(BaseSettings):
         str,
         Field(description="Codice Comune as ISTAT code"),
     ]
-
-    @model_validator(mode="after")
-    def validate_all_keys_present(self) -> "AnncsuUpdateSettings":
-        """Validate that ALL ANNCSU_UPDATE_* variables are present in .env or environment.
-
-        The variables can have empty values (""), but they must be defined (not None).
-        None means the variable was never set, "" means it was set but empty.
-
-        Raises:
-            ValidationError: If any required variable is not defined
-        """
-        value = getattr(self, "codice_comune", None)
-        # None means not defined at all, "" is valid (defined but empty)
-        if value is None:
-            raise ValidationError(
-                "Missing required environment variables in .env:\n"
-                + "\nANNCSU_UPDATE_CODICE_COMUNE"
-                + "\n\nAll nANNCSU_UPDATE_CODICE_COMUNE* variables must be present (can be empty)."
-            )
-
-        return self
 
 
 __all__ = [

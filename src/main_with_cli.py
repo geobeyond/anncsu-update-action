@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 
 # Anncsu Update Action
-# This action extracts specified tables from a DuckDB database file
-# and saves them in the desired format (GPKG or Parquet).
-# two versions of the table are extracted: current and previous (if available)
-# where previous refers to the version in the previous commit.
+# This action updates the ANNCSU database by processing geodiff reports
+# and calling the ANNCSU CLI to sync coordinate changes.
 
 from __future__ import annotations
 
@@ -69,6 +67,15 @@ class GeometryProtocol(Protocol):
 
 
 # ============================================================================
+# Column index constants for geodiff entries
+# ============================================================================
+
+COLUMN_ADDRESS_ID = 0  # PROGRESSIVO_ACCESSO
+COLUMN_GEOMETRY = 1
+COLUMN_ROAD_ID = 2  # PROGRESSIVO_NAZIONALE
+
+
+# ============================================================================
 # Data classes for structured results
 # ============================================================================
 
@@ -118,15 +125,11 @@ def decode_gpkg_geometry(
     return wkb_loader(wkb_geom)
 
 
-def extract_coordinates_from_geometry(
-    geometry: GeometryProtocol,
-    point_class: Any,
-) -> Coordinates:
+def extract_coordinates_from_geometry(geometry: GeometryProtocol) -> Coordinates:
     """Extract X,Y coordinates from a Point geometry.
 
     Args:
         geometry: Shapely geometry object
-        point_class: shapely.Point class for coordinate extraction
 
     Returns:
         Coordinates object with x,y values
@@ -140,16 +143,14 @@ def extract_coordinates_from_geometry(
     if geometry.geom_type != "Point":
         raise ValueError(f"Geometry is not a Point, got: {geometry.geom_type}")
 
-    coord = list(geometry.coords)[0]
-    point = point_class(coord)
-    return Coordinates(x=point.x, y=point.y)
+    x, y = list(geometry.coords)[0]
+    return Coordinates(x=x, y=y)
 
 
 def parse_gpkg_to_coordinates(
     gpkg_base64: str,
     geodiff: GeoDiffProtocol,
     wkb_loader: Any,
-    point_class: Any,
 ) -> Coordinates:
     """Parse a GPKG geometry string to X,Y coordinates.
 
@@ -160,7 +161,6 @@ def parse_gpkg_to_coordinates(
         gpkg_base64: Base64-encoded GPKG geometry
         geodiff: GeoDiff instance
         wkb_loader: shapely.wkb.loads function
-        point_class: shapely.Point class
 
     Returns:
         Coordinates object
@@ -169,7 +169,7 @@ def parse_gpkg_to_coordinates(
         ValueError: If parsing fails
     """
     geometry = decode_gpkg_geometry(gpkg_base64, geodiff, wkb_loader)
-    return extract_coordinates_from_geometry(geometry, point_class)
+    return extract_coordinates_from_geometry(geometry)
 
 
 # ============================================================================
@@ -191,12 +191,12 @@ def extract_entry_data(entry: GeodiffEntry) -> tuple[int | None, int | None, str
     gpkg_geom = None
 
     for change in entry.changes:
-        if change.column == 0:
+        if change.column == COLUMN_ADDRESS_ID:
             address_id = change.new or change.old
-        if change.column == 2:
-            road_id = change.new or change.old
-        elif change.column == 1:
+        elif change.column == COLUMN_GEOMETRY:
             gpkg_geom = change.new or change.old
+        elif change.column == COLUMN_ROAD_ID:
+            road_id = change.new or change.old
 
     return address_id, road_id, gpkg_geom
 
@@ -208,7 +208,6 @@ def process_entry(
     cli_app: Any,
     geodiff: GeoDiffProtocol,
     wkb_loader: Any,
-    point_class: Any,
     logger: LoggerProtocol,
 ) -> bool:
     """Process a single geodiff entry and call the ANNCSU CLI.
@@ -220,7 +219,6 @@ def process_entry(
         cli_app: ANNCSU CLI app
         geodiff: GeoDiff instance for geometry conversion
         wkb_loader: shapely.wkb.loads function
-        point_class: shapely.Point class
         logger: Logger for output
 
     Returns:
@@ -234,7 +232,7 @@ def process_entry(
     # Parse geometry if present
     if gpkg_geom:
         try:
-            coords = parse_gpkg_to_coordinates(gpkg_geom, geodiff, wkb_loader, point_class)
+            coords = parse_gpkg_to_coordinates(gpkg_geom, geodiff, wkb_loader)
             x, y = coords.x, coords.y
             logger.info(f"Extracted coordinates: x={x}, y={y}")
         except ValueError as e:
@@ -294,7 +292,6 @@ def process_all_entries(
     cli_app: Any,
     geodiff: GeoDiffProtocol,
     wkb_loader: Any,
-    point_class: Any,
     logger: LoggerProtocol,
 ) -> list[EntryResult]:
     """Process all entries in a geodiff file.
@@ -306,7 +303,6 @@ def process_all_entries(
         cli_app: ANNCSU CLI app
         geodiff: GeoDiff instance
         wkb_loader: shapely.wkb.loads function
-        point_class: shapely.Point class
         logger: Logger for output
 
     Returns:
@@ -321,7 +317,6 @@ def process_all_entries(
             cli_app=cli_app,
             geodiff=geodiff,
             wkb_loader=wkb_loader,
-            point_class=point_class,
             logger=logger,
         )
         results.append(EntryResult(entry_type=entry.type, success=success))
@@ -343,30 +338,22 @@ def load_geodiff_report(geodiff_report: str, logger: LoggerProtocol) -> GeodiffF
     Returns:
         Parsed GeodiffFile or None if loading failed
     """
-    report_path = Path(geodiff_report)
-    geodiff_obj = None
-
+    # Try as file path first
     try:
+        report_path = Path(geodiff_report)
         if report_path.exists():
             logger.info(f"Found geodiff report file: {report_path}")
-            try:
-                geodiff_obj = GeodiffFile.from_path(report_path)
-            except Exception as exc:
-                logger.error(f"Failed to parse geodiff report file: {exc}")
-        else:
-            logger.info("geodiff_report input does not point to a file; attempting to parse as JSON text")
-            try:
-                geodiff_obj = GeodiffFile.from_json_text(geodiff_report)
-            except Exception as exc:
-                logger.error(f"Failed to parse geodiff_report input as JSON: {exc}")
-    except Exception:
-        logger.warn("Can't open geodiff_report as file, try as json")
-        try:
-            geodiff_obj = GeodiffFile.from_json_text(geodiff_report)
-        except Exception as exc:
-            logger.error(f"Failed to parse geodiff_report input as JSON: {exc}")
+            return GeodiffFile.from_path(report_path)
+    except Exception as exc:
+        logger.debug(f"Not a valid file path: {exc}")
 
-    return geodiff_obj
+    # Fall back to parsing as JSON text
+    logger.info("Attempting to parse geodiff_report as JSON text")
+    try:
+        return GeodiffFile.from_json_text(geodiff_report)
+    except Exception as exc:
+        logger.error(f"Failed to parse geodiff_report: {exc}")
+        return None
 
 
 # ============================================================================
@@ -415,7 +402,6 @@ def run_action(
     cli_app: Any,
     geodiff: GeoDiffProtocol,
     wkb_loader: Any,
-    point_class: Any,
     logger: LoggerProtocol,
     api_type: str = "pa",
 ) -> bool:
@@ -431,7 +417,6 @@ def run_action(
         cli_app: ANNCSU CLI app
         geodiff: GeoDiff instance
         wkb_loader: shapely.wkb.loads function
-        point_class: shapely.Point class
         logger: Logger for output
         api_type: API type for CLI authentication
 
@@ -461,7 +446,6 @@ def run_action(
         cli_app=cli_app,
         geodiff=geodiff,
         wkb_loader=wkb_loader,
-        point_class=point_class,
         logger=logger,
     )
 
@@ -482,7 +466,7 @@ def main() -> None:
     """Main entry point when running as a GitHub Action."""
     # Import dependencies only when running as main
     from typer.testing import CliRunner
-    from shapely import wkb, Point
+    from shapely import wkb
     from pygeodiff import GeoDiff
 
     from actions import context, core
@@ -529,7 +513,6 @@ def main() -> None:
         cli_app=app,
         geodiff=GeoDiff(),
         wkb_loader=wkb.loads,
-        point_class=Point,
         logger=core,
         api_type="pa",
     )

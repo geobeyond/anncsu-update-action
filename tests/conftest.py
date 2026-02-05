@@ -360,6 +360,239 @@ def geodiff_empty_json():
 
 
 # ============================================================================
+# Fixtures - Geodiff Report Files (for integration tests)
+# ============================================================================
+
+
+@pytest.fixture
+def geodiff_update_report_file(tmp_path):
+    """Create a geodiff update report file as in test.yaml workflow.
+
+    This mirrors the "Create geodiff fake update report" step in test.yaml.
+    """
+    report_content = {
+        "geodiff": [
+            {
+                "changes": [
+                    {"column": 0, "old": 28671617},
+                    {"column": 2, "old": 1222582},
+                    {"column": 6, "new": "4", "old": "44"},
+                ],
+                "table": "WhereAbouts_fails",
+                "type": "update",
+            }
+        ]
+    }
+    report_file = tmp_path / "geodiff_update_report.json"
+    report_file.write_text(json.dumps(report_content, indent=2))
+    return report_file
+
+
+@pytest.fixture
+def geodiff_delete_report_file(tmp_path):
+    """Create a geodiff delete report file.
+
+    This mirrors the delete scenario in test-delete-check-with-geodiff.
+    """
+    report_content = {
+        "geodiff": [
+            {
+                "table": "test_layer",
+                "type": "delete",
+                "changes": [
+                    {"column": 0, "old": 2},
+                    {"column": 1, "old": "R1AAAeYQAAABAQAAAPBDGq/kSde/+HS2Feb94T8="},
+                    {"column": 2, "old": "Point B"},
+                    {"column": 3, "old": 2},
+                    {"column": 4, "old": 202},
+                ],
+            },
+            {
+                "table": "test_layer",
+                "type": "delete",
+                "changes": [
+                    {"column": 0, "old": 4},
+                    {"column": 1, "old": "R1AAAeYQAAABAQAAAFyu1BOp6um/PoMqH8N01j8="},
+                    {"column": 2, "old": "Point D"},
+                    {"column": 3, "old": 4},
+                    {"column": 4, "old": 404},
+                ],
+            },
+        ]
+    }
+    report_file = tmp_path / "geodiff_delete_report.json"
+    report_file.write_text(json.dumps(report_content, indent=2))
+    return report_file
+
+
+@pytest.fixture
+def geodiff_insert_report_file(tmp_path):
+    """Create a geodiff insert report file.
+
+    This mirrors the insert scenario in test-insert-check-with-geodiff.
+    """
+    report_content = {
+        "geodiff": [
+            {
+                "table": "test_layer",
+                "type": "insert",
+                "changes": [
+                    {"column": 0, "new": 6},
+                    {"column": 1, "new": "R1AAAeYQAAABAQAAAFyu1BOp6um/PoMqH8N01j8="},
+                    {"column": 2, "new": "Inserted Point F"},
+                    {"column": 3, "new": 6},
+                    {"column": 4, "new": 606},
+                ],
+            },
+            {
+                "table": "test_layer",
+                "type": "insert",
+                "changes": [
+                    {"column": 0, "new": 7},
+                    {"column": 1, "new": "R1AAAeYQAAABAQAAAPBDGq/kSde/+HS2Feb94T8="},
+                    {"column": 2, "new": "Inserted Point G"},
+                    {"column": 3, "new": 7},
+                    {"column": 4, "new": 707},
+                ],
+            },
+        ]
+    }
+    report_file = tmp_path / "geodiff_insert_report.json"
+    report_file.write_text(json.dumps(report_content, indent=2))
+    return report_file
+
+
+@pytest.fixture
+def geodiff_mixed_report_file(tmp_path):
+    """Create a geodiff report with mixed operations (insert, update, delete).
+
+    This tests processing multiple operation types in a single report.
+    """
+    report_content = {
+        "geodiff": [
+            {
+                "table": "test_layer",
+                "type": "update",
+                "changes": [
+                    {"column": 0, "old": 1},
+                    {"column": 1, "new": "R1AAAQAAAAABAQAAAAAAAICcwitAAAAAwInzREA="},
+                    {"column": 2, "old": 101},
+                ],
+            },
+            {
+                "table": "test_layer",
+                "type": "insert",
+                "changes": [
+                    {"column": 0, "new": 10},
+                    {"column": 1, "new": "R1AAAeYQAAABAQAAAFyu1BOp6um/PoMqH8N01j8="},
+                    {"column": 2, "new": 1010},
+                ],
+            },
+            {
+                "table": "test_layer",
+                "type": "delete",
+                "changes": [
+                    {"column": 0, "old": 5},
+                    {"column": 1, "old": "R1AAAeYQAAABAQAAAPBDGq/kSde/+HS2Feb94T8="},
+                    {"column": 2, "old": 505},
+                ],
+            },
+        ]
+    }
+    report_file = tmp_path / "geodiff_mixed_report.json"
+    report_file.write_text(json.dumps(report_content, indent=2))
+    return report_file
+
+
+# ============================================================================
+# Fixtures - GeoPackage files (for geodiff comparison tests)
+# ============================================================================
+
+
+@pytest.fixture
+def base_geopackage(tmp_path):
+    """Create a base GeoPackage file with test data.
+
+    This mirrors the GeoPackage creation in the workflow steps.
+    """
+    import sqlite3
+
+    gpkg_path = tmp_path / "base.gpkg"
+
+    conn = sqlite3.connect(gpkg_path)
+    cursor = conn.cursor()
+
+    # Create required GeoPackage tables
+    cursor.executescript("""
+        CREATE TABLE gpkg_spatial_ref_sys (
+            srs_name TEXT NOT NULL,
+            srs_id INTEGER NOT NULL PRIMARY KEY,
+            organization TEXT NOT NULL,
+            organization_coordsys_id INTEGER NOT NULL,
+            definition TEXT NOT NULL,
+            description TEXT
+        );
+
+        CREATE TABLE gpkg_contents (
+            table_name TEXT NOT NULL PRIMARY KEY,
+            data_type TEXT NOT NULL,
+            identifier TEXT UNIQUE,
+            description TEXT DEFAULT '',
+            last_change DATETIME NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+            min_x DOUBLE,
+            min_y DOUBLE,
+            max_x DOUBLE,
+            max_y DOUBLE,
+            srs_id INTEGER
+        );
+
+        CREATE TABLE gpkg_geometry_columns (
+            table_name TEXT NOT NULL,
+            column_name TEXT NOT NULL,
+            geometry_type_name TEXT NOT NULL,
+            srs_id INTEGER NOT NULL,
+            z TINYINT NOT NULL,
+            m TINYINT NOT NULL,
+            CONSTRAINT pk_geom_cols PRIMARY KEY (table_name, column_name)
+        );
+
+        INSERT INTO gpkg_spatial_ref_sys VALUES (
+            'WGS 84', 4326, 'EPSG', 4326,
+            'GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563]],PRIMEM["Greenwich",0],UNIT["degree",0.0174532925199433]]',
+            NULL
+        );
+
+        CREATE TABLE test_layer (
+            fid INTEGER PRIMARY KEY AUTOINCREMENT,
+            geom BLOB,
+            name TEXT,
+            address_id INTEGER,
+            road_id INTEGER
+        );
+
+        INSERT INTO gpkg_contents VALUES (
+            'test_layer', 'features', 'test_layer', '',
+            datetime('now'), NULL, NULL, NULL, NULL, 4326
+        );
+
+        INSERT INTO gpkg_geometry_columns VALUES (
+            'test_layer', 'geom', 'POINT', 4326, 0, 0
+        );
+
+        INSERT INTO test_layer (fid, name, address_id, road_id) VALUES (1, 'Point A', 1, 101);
+        INSERT INTO test_layer (fid, name, address_id, road_id) VALUES (2, 'Point B', 2, 202);
+        INSERT INTO test_layer (fid, name, address_id, road_id) VALUES (3, 'Point C', 3, 303);
+        INSERT INTO test_layer (fid, name, address_id, road_id) VALUES (4, 'Point D', 4, 404);
+        INSERT INTO test_layer (fid, name, address_id, road_id) VALUES (5, 'Point E', 5, 505);
+    """)
+
+    conn.commit()
+    conn.close()
+
+    return gpkg_path
+
+
+# ============================================================================
 # Legacy Fixtures (for backward compatibility during transition)
 # ============================================================================
 
