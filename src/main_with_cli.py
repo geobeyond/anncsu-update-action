@@ -192,11 +192,14 @@ def extract_entry_data(entry: GeodiffEntry) -> tuple[int | None, int | None, str
 
     for change in entry.changes:
         if change.column == COLUMN_ADDRESS_ID:
-            address_id = change.new or change.old
+            value = change.new or change.old
+            address_id = int(value) if value is not None else None
         elif change.column == COLUMN_GEOMETRY:
-            gpkg_geom = change.new or change.old
+            value = change.new or change.old
+            gpkg_geom = str(value) if value is not None else None
         elif change.column == COLUMN_ROAD_ID:
-            road_id = change.new or change.old
+            value = change.new or change.old
+            road_id = int(value) if value is not None else None
 
     return address_id, road_id, gpkg_geom
 
