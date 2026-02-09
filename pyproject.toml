@@ -74,3 +74,8 @@ dev = { features = ["dev"], solve-group = "default" }
 test = { features = ["test"], solve-group = "default" }
 
 [tool.pixi.tasks]
+
+[tool.pixi.feature.dev.dependencies]
+ipython = ">=9.9.0,<10"
+duckdb = ">=1.4.4,<2"
+geopandas = ">=1.1.2,<2"
