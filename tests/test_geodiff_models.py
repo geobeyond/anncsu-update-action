@@ -46,7 +46,7 @@ def test_parse_insert(geodiff_insert_json):
     entry = g.geodiff[0]
     assert entry.type == "insert"
     assert entry.changes[0].new == 4
-    assert entry.changes[2].new == "my new point A"
+    assert entry.changes[2].new == 401  # road_id (column 2)
 
 
 def test_write_entry_type_schemas_and_validate(tmp_path):

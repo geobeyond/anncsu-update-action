@@ -42,6 +42,14 @@ class AnncsuUpdateSettings(BaseSettings):
         Field(description="Codice Comune as ISTAT code"),
     ]
 
+    coordinate_distance_threshold: Annotated[
+        float,
+        Field(
+            default=0.00001,
+            description="Distance in degrees to decide when a coordinate point has changed",
+        ),
+    ]
+
 
 __all__ = [
     "AnncsuUpdateSettings",

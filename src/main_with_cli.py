@@ -8,12 +8,15 @@ from __future__ import annotations
 
 import json
 import base64
-from dataclasses import dataclass
 from pathlib import Path
+from dataclasses import dataclass
 from typing import Protocol, Any, runtime_checkable
 
 from geodiff_models import GeodiffFile, GeodiffEntry
 
+# using ANNCSU-SDK to query the database for existing records and to perform updates via CLI calls
+from anncsu.common import Security
+from anncsu.pa import AnncsuConsultazione
 
 # ============================================================================
 # Protocol definitions for dependency injection
@@ -39,6 +42,7 @@ class SettingsProtocol(Protocol):
     """Protocol for settings."""
 
     codice_comune: str
+    coordinate_distance_threshold: float
 
     def model_dump_json(self) -> str: ...
 
@@ -209,6 +213,7 @@ def process_entry(
     settings: SettingsProtocol,
     cli_runner: CliRunnerProtocol,
     cli_app: Any,
+    anncsu_security: Security,
     geodiff: GeoDiffProtocol,
     wkb_loader: Any,
     logger: LoggerProtocol,
@@ -220,17 +225,21 @@ def process_entry(
         settings: Application settings
         cli_runner: CLI runner instance
         cli_app: ANNCSU CLI app
+        anncsu_security: Security instance for SDK calls with CLI token
         geodiff: GeoDiff instance for geometry conversion
         wkb_loader: shapely.wkb.loads function
         logger: Logger for output
-
     Returns:
         True if processing succeeded, False otherwise
     """
     action = entry.type
     table = entry.table
 
+    # Extract relevant data from entry changes that have to exist
     address_id, road_id, gpkg_geom = extract_entry_data(entry)
+    if address_id is None:
+        logger.warn(f"Entry has no address_id; skipping entry: {entry}")
+        return False
 
     # Parse geometry if present
     if gpkg_geom:
@@ -247,14 +256,48 @@ def process_entry(
 
     logger.info(f"Preparing ANNCSU CLI call: action={action} table={table} address_id={address_id} road_id={road_id}")
 
-    if action == "insert":
-        logger.info(f"Insert {len(entry.changes)} values into {table}")
-        # TODO: implement insert CLI call
-        return True
+    # a special case of insert when address_id is negative e.g. it is a new record without an assigned address_id, in this case we have to extract the ODONIMO from the scope database using the road_id and use it as address_id for the CLI call
+    if action == "insert" and address_id < 0:
+        logger.info(f"Address ID is negative ({address_id}), means it is a new record")
+        # TODO: do insert when sdk or cli available to create a new record and get the assigned address_id
+        logger.warn(f"Insert action with negative address_id is not implemented yet; skipping entry: {entry}")
+        return False
 
-    elif action == "update":
-        logger.info(f"Update {len(entry.changes)} column values in {table} with PK: address_id={address_id}")
+    # manage insert/update of coordinates in ANNCSU via CLI calls, based on the geodiff entry type
+    if action == "insert" or action == "update":
+        logger.info(f"{action} {len(entry.changes)} column values in {table} with PK: address_id={address_id}")
 
+        # check if record exists in ANNCSU before deciding to insert or update
+        sdk = AnncsuConsultazione(security=anncsu_security)
+
+        # get anncsu data basing on address_id
+        response = sdk.pathparam.prognazarea_get_path_param(prognaz=f"{address_id}")
+        if response.res != "OK":
+            logger.error(f"Failed to query ANNCSU for address_id={address_id}: {response.res} - {response.message}")
+            return False
+        if len(response.data) == 0:
+            logger.warn(f"No ANNCSU record found for address_id={address_id}; skipping update")
+            return False
+        if len(response.data) > 1:
+            logger.warn(f"Multiple ANNCSU records found for address_id={address_id}; skipping update")
+            return False
+        anncsu_record = response.data[0]
+
+        # get anncsu coordinate to check if they are been modified
+        # if coordinates are the same, skip the update to avoid unnecessary CLI calls
+        coord_x = anncsu_record.coord_x
+        coord_y = anncsu_record.coord_y
+        # quota = anncsu_record.quota
+        if coord_x is not None and coord_y is not None:
+            anncsu_coords = parse_gpkg_to_coordinates(anncsu_record.dug, geodiff, wkb_loader)
+            if (
+                abs(anncsu_coords.x - coord_x) < settings.coordinate_distance_threshold
+                and abs(anncsu_coords.y - coord_y) < settings.coordinate_distance_threshold
+            ):
+                logger.info(f"Coordinates for address_id={address_id} are the same in ANNCSU; skipping update")
+                return True
+
+        # update coordinates via CLI
         result = cli_runner.invoke(
             cli_app,
             [
@@ -296,6 +339,7 @@ def process_all_entries(
     geodiff: GeoDiffProtocol,
     wkb_loader: Any,
     logger: LoggerProtocol,
+    anncsu_security: Security,
 ) -> list[EntryResult]:
     """Process all entries in a geodiff file.
 
@@ -304,9 +348,11 @@ def process_all_entries(
         settings: Application settings
         cli_runner: CLI runner instance
         cli_app: ANNCSU CLI app
+        anncsu_security: Security instance for SDK calls with CLI token
         geodiff: GeoDiff instance
         wkb_loader: shapely.wkb.loads function
         logger: Logger for output
+        anncsu_security: Security instance for SDK calls with CLI token
 
     Returns:
         List of EntryResult objects
@@ -318,6 +364,7 @@ def process_all_entries(
             settings=settings,
             cli_runner=cli_runner,
             cli_app=cli_app,
+            anncsu_security=anncsu_security,
             geodiff=geodiff,
             wkb_loader=wkb_loader,
             logger=logger,
@@ -406,6 +453,7 @@ def run_action(
     geodiff: GeoDiffProtocol,
     wkb_loader: Any,
     logger: LoggerProtocol,
+    token: str,
     api_type: str = "pa",
 ) -> bool:
     """Run the ANNCSU update action.
@@ -422,6 +470,7 @@ def run_action(
         wkb_loader: shapely.wkb.loads function
         logger: Logger for output
         api_type: API type for CLI authentication
+        token: Token for SDK calls (if needed)
 
     Returns:
         True if action completed successfully, False otherwise
@@ -440,6 +489,9 @@ def run_action(
         logger.set_failed("Failed to authenticate with ANNCSU CLI")
         return False
 
+    # security class to use SDK calls with the same token as CLI
+    anncsu_security = Security(bearer=token, validate_expiration=True)
+
     # Process all entries
     logger.info("ANNCSU CLI update based on geodiff report JSON...")
     results = process_all_entries(
@@ -450,6 +502,7 @@ def run_action(
         geodiff=geodiff,
         wkb_loader=wkb_loader,
         logger=logger,
+        anncsu_security=anncsu_security,
     )
 
     success = all(r.success for r in results)
@@ -484,6 +537,8 @@ def main() -> None:
     # Get inputs
     geodiff_report: str = core.get_input("geodiff_report", True)
     core.info(f"geodiff_report: \033[36;1m{geodiff_report}")
+    anncsu_scope_db: str = core.get_input("anncsu_scope_db", True)
+    core.info(f"anncsu_scope_db: \033[36;1m{anncsu_scope_db}")
     _token: str = core.get_input("token", True)  # noqa: F841
 
     # Debug info
@@ -517,6 +572,7 @@ def main() -> None:
         geodiff=GeoDiff(),
         wkb_loader=wkb.loads,
         logger=core,
+        token=_token,
         api_type="pa",
     )
 

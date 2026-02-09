@@ -14,7 +14,7 @@ from main_with_cli import (
     process_all_entries,
     run_action,
 )
-from conftest import MockCliResult, MockGeometry
+from conftest import MockCliResult, MockGeometry, MockAnncsuConsultazione
 
 
 # ============================================================================
@@ -78,6 +78,7 @@ class TestProcessEntriesIntegration:
         mock_cli_app,
         mock_geodiff,
         mock_logger,
+        mock_anncsu_security,
     ):
         """Test processing update entries loaded from a file.
 
@@ -97,6 +98,7 @@ class TestProcessEntriesIntegration:
             geodiff=mock_geodiff,
             wkb_loader=mock_wkb_loader,
             logger=mock_logger,
+            anncsu_security=mock_anncsu_security,
         )
 
         assert len(results) == 1
@@ -112,6 +114,7 @@ class TestProcessEntriesIntegration:
         mock_cli_app,
         mock_geodiff,
         mock_logger,
+        mock_anncsu_security,
     ):
         """Test processing delete entries loaded from a file."""
         geodiff_file = GeodiffFile.from_path(geodiff_delete_report_file)
@@ -127,6 +130,7 @@ class TestProcessEntriesIntegration:
             geodiff=mock_geodiff,
             wkb_loader=mock_wkb_loader,
             logger=mock_logger,
+            anncsu_security=mock_anncsu_security,
         )
 
         assert len(results) == 2
@@ -142,8 +146,16 @@ class TestProcessEntriesIntegration:
         mock_cli_app,
         mock_geodiff,
         mock_logger,
+        mock_anncsu_security,
+        monkeypatch,
     ):
         """Test processing insert entries loaded from a file."""
+        # Mock the AnncsuConsultazione SDK
+        monkeypatch.setattr(
+            "main_with_cli.AnncsuConsultazione",
+            lambda security: MockAnncsuConsultazione(security),
+        )
+
         geodiff_file = GeodiffFile.from_path(geodiff_insert_report_file)
 
         def mock_wkb_loader(data):
@@ -157,6 +169,7 @@ class TestProcessEntriesIntegration:
             geodiff=mock_geodiff,
             wkb_loader=mock_wkb_loader,
             logger=mock_logger,
+            anncsu_security=mock_anncsu_security,
         )
 
         assert len(results) == 2
@@ -172,8 +185,16 @@ class TestProcessEntriesIntegration:
         mock_cli_app,
         mock_geodiff,
         mock_logger,
+        mock_anncsu_security,
+        monkeypatch,
     ):
         """Test processing mixed operation entries from a file."""
+        # Mock the AnncsuConsultazione SDK
+        monkeypatch.setattr(
+            "main_with_cli.AnncsuConsultazione",
+            lambda security: MockAnncsuConsultazione(security),
+        )
+
         geodiff_file = GeodiffFile.from_path(geodiff_mixed_report_file)
 
         def mock_wkb_loader(data):
@@ -187,6 +208,7 @@ class TestProcessEntriesIntegration:
             geodiff=mock_geodiff,
             wkb_loader=mock_wkb_loader,
             logger=mock_logger,
+            anncsu_security=mock_anncsu_security,
         )
 
         assert len(results) == 3
@@ -226,6 +248,7 @@ class TestRunActionIntegration:
             geodiff=mock_geodiff,
             wkb_loader=mock_wkb_loader,
             logger=mock_logger,
+            token="test-token",
         )
 
         assert result is True
@@ -240,8 +263,14 @@ class TestRunActionIntegration:
         mock_cli_app,
         mock_geodiff,
         mock_logger,
+        monkeypatch,
     ):
         """Test full run_action flow with an insert report file."""
+        # Mock the AnncsuConsultazione SDK
+        monkeypatch.setattr(
+            "main_with_cli.AnncsuConsultazione",
+            lambda security: MockAnncsuConsultazione(security),
+        )
 
         def mock_wkb_loader(data):
             return MockGeometry()
@@ -254,6 +283,7 @@ class TestRunActionIntegration:
             geodiff=mock_geodiff,
             wkb_loader=mock_wkb_loader,
             logger=mock_logger,
+            token="test-token",
         )
 
         assert result is True
@@ -268,8 +298,14 @@ class TestRunActionIntegration:
         mock_cli_app,
         mock_geodiff,
         mock_logger,
+        monkeypatch,
     ):
         """Test full run_action flow with a mixed operations report file."""
+        # Mock the AnncsuConsultazione SDK
+        monkeypatch.setattr(
+            "main_with_cli.AnncsuConsultazione",
+            lambda security: MockAnncsuConsultazione(security),
+        )
 
         def mock_wkb_loader(data):
             return MockGeometry()
@@ -282,6 +318,7 @@ class TestRunActionIntegration:
             geodiff=mock_geodiff,
             wkb_loader=mock_wkb_loader,
             logger=mock_logger,
+            token="test-token",
         )
 
         assert result is True
@@ -295,8 +332,15 @@ class TestRunActionIntegration:
         mock_cli_app,
         mock_geodiff,
         mock_logger,
+        monkeypatch,
     ):
         """Test that run_action authenticates before processing entries."""
+        # Mock the AnncsuConsultazione SDK
+        monkeypatch.setattr(
+            "main_with_cli.AnncsuConsultazione",
+            lambda security: MockAnncsuConsultazione(security),
+        )
+
         call_order = []
 
         class TrackingCliRunner:
@@ -324,6 +368,7 @@ class TestRunActionIntegration:
             geodiff=mock_geodiff,
             wkb_loader=mock_wkb_loader,
             logger=mock_logger,
+            token="test-token",
         )
 
         assert result is True
@@ -359,6 +404,7 @@ class TestErrorScenariosIntegration:
             geodiff=mock_geodiff,
             wkb_loader=mock_wkb_loader,
             logger=mock_logger,
+            token="test-token",
         )
 
         assert result is False
@@ -382,6 +428,7 @@ class TestErrorScenariosIntegration:
             geodiff=mock_geodiff,
             wkb_loader=mock_wkb_loader,
             logger=mock_logger,
+            token="test-token",
         )
 
         assert result is False
@@ -405,6 +452,7 @@ class TestErrorScenariosIntegration:
             geodiff=mock_geodiff,
             wkb_loader=mock_wkb_loader,
             logger=mock_logger,
+            token="test-token",
         )
 
         # Empty is success (nothing to process)

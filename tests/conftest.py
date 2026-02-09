@@ -61,9 +61,16 @@ class MockSettings:
     """Mock settings object."""
 
     codice_comune: str = "I501"
+    coordinate_distance_threshold: float = 0.001
+    geocoded_table: str = "geocoded_civici"
 
     def model_dump_json(self) -> str:
-        return json.dumps({"ANNCSU_UPDATE_CODICE_COMUNE": self.codice_comune})
+        return json.dumps(
+            {
+                "ANNCSU_UPDATE_CODICE_COMUNE": self.codice_comune,
+                "coordinate_distance_threshold": self.coordinate_distance_threshold,
+            }
+        )
 
 
 @dataclass
@@ -130,6 +137,52 @@ class MockPoint:
         self.y = coord[1]
 
 
+@dataclass
+class MockAnncsuRecord:
+    """Mock ANNCSU record returned by SDK."""
+
+    coord_x: float | None = 10.0  # Different from mock_wkb_loader (12.34)
+    coord_y: float | None = 50.0  # Different from mock_wkb_loader (56.78)
+    dug: str = "R1AAAQAAAAABAQAAAAAAAICcwitAAAAAwInzREA="
+
+
+@dataclass
+class MockAnncsuResponse:
+    """Mock ANNCSU SDK response."""
+
+    res: str = "OK"
+    message: str = ""
+    data: list[MockAnncsuRecord] = field(default_factory=lambda: [MockAnncsuRecord()])
+
+
+@dataclass
+class MockPathParam:
+    """Mock ANNCSU SDK pathparam."""
+
+    response: MockAnncsuResponse = field(default_factory=MockAnncsuResponse)
+
+    def prognazarea_get_path_param(self, prognaz: str) -> MockAnncsuResponse:
+        return self.response
+
+
+@dataclass
+class MockAnncsuConsultazione:
+    """Mock ANNCSU SDK consultazione class."""
+
+    pathparam: MockPathParam = field(default_factory=MockPathParam)
+
+    def __init__(self, security: Any = None):
+        self.pathparam = MockPathParam()
+
+
+@dataclass
+class MockSecurity:
+    """Mock ANNCSU Security class."""
+
+    bearer: str = "test-token"
+    validate_expiration: bool = True
+
+
 # ============================================================================
 # Fixtures - Mocks
 # ============================================================================
@@ -179,6 +232,18 @@ def mock_point_class():
 def mock_cli_app():
     """Mock CLI app object."""
     return SimpleNamespace(name="mock-anncsu-cli")
+
+
+@pytest.fixture
+def mock_anncsu_security() -> MockSecurity:
+    """Create a mock ANNCSU Security object."""
+    return MockSecurity()
+
+
+@pytest.fixture
+def mock_anncsu_consultazione() -> MockAnncsuConsultazione:
+    """Create a mock ANNCSU Consultazione SDK."""
+    return MockAnncsuConsultazione()
 
 
 # ============================================================================
@@ -286,8 +351,8 @@ def geodiff_delete_json():
                     "changes": [
                         {"column": 0, "old": 2},
                         {"column": 1, "old": "R1AAAeYQAAABAQAAAPBDGq/kSde/+HS2Feb94T8="},
-                        {"column": 2, "old": "feature2"},
-                        {"column": 3, "old": 2},
+                        {"column": 2, "old": 202},  # road_id should be integer
+                        {"column": 3, "old": "feature2"},  # other field
                     ],
                 }
             ]
@@ -306,8 +371,8 @@ def geodiff_insert_json():
                     "changes": [
                         {"column": 0, "new": 4},
                         {"column": 1, "new": "R1AAAeYQAAABAQAAAFyu1BOp6um/PoMqH8N01j8="},
-                        {"column": 2, "new": "my new point A"},
-                        {"column": 3, "new": 1},
+                        {"column": 2, "new": 401},  # road_id should be integer
+                        {"column": 3, "new": "my new point A"},  # other field
                     ],
                 }
             ]
@@ -402,9 +467,9 @@ def geodiff_delete_report_file(tmp_path):
                 "changes": [
                     {"column": 0, "old": 2},
                     {"column": 1, "old": "R1AAAeYQAAABAQAAAPBDGq/kSde/+HS2Feb94T8="},
-                    {"column": 2, "old": "Point B"},
-                    {"column": 3, "old": 2},
-                    {"column": 4, "old": 202},
+                    {"column": 2, "old": 202},  # road_id should be integer
+                    {"column": 3, "old": "Point B"},  # other field
+                    {"column": 4, "old": 2},
                 ],
             },
             {
@@ -413,9 +478,9 @@ def geodiff_delete_report_file(tmp_path):
                 "changes": [
                     {"column": 0, "old": 4},
                     {"column": 1, "old": "R1AAAeYQAAABAQAAAFyu1BOp6um/PoMqH8N01j8="},
-                    {"column": 2, "old": "Point D"},
-                    {"column": 3, "old": 4},
-                    {"column": 4, "old": 404},
+                    {"column": 2, "old": 404},  # road_id should be integer
+                    {"column": 3, "old": "Point D"},  # other field
+                    {"column": 4, "old": 4},
                 ],
             },
         ]
@@ -439,9 +504,9 @@ def geodiff_insert_report_file(tmp_path):
                 "changes": [
                     {"column": 0, "new": 6},
                     {"column": 1, "new": "R1AAAeYQAAABAQAAAFyu1BOp6um/PoMqH8N01j8="},
-                    {"column": 2, "new": "Inserted Point F"},
-                    {"column": 3, "new": 6},
-                    {"column": 4, "new": 606},
+                    {"column": 2, "new": 606},  # road_id should be integer
+                    {"column": 3, "new": "Inserted Point F"},  # other field
+                    {"column": 4, "new": 6},
                 ],
             },
             {
@@ -450,9 +515,9 @@ def geodiff_insert_report_file(tmp_path):
                 "changes": [
                     {"column": 0, "new": 7},
                     {"column": 1, "new": "R1AAAeYQAAABAQAAAPBDGq/kSde/+HS2Feb94T8="},
-                    {"column": 2, "new": "Inserted Point G"},
-                    {"column": 3, "new": 7},
-                    {"column": 4, "new": 707},
+                    {"column": 2, "new": 707},  # road_id should be integer
+                    {"column": 3, "new": "Inserted Point G"},  # other field
+                    {"column": 4, "new": 7},
                 ],
             },
         ]
