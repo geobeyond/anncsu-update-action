@@ -534,8 +534,6 @@ def main() -> None:
     # Get inputs
     geodiff_report: str = core.get_input("geodiff_report", True)
     core.info(f"geodiff_report: \033[36;1m{geodiff_report}")
-    anncsu_scope_db: str = core.get_input("anncsu_scope_db", True)
-    core.info(f"anncsu_scope_db: \033[36;1m{anncsu_scope_db}")
     _token: str = core.get_input("token", True)  # noqa: F841
 
     # Debug info
