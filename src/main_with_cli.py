@@ -213,7 +213,7 @@ def process_entry(
     settings: SettingsProtocol,
     cli_runner: CliRunnerProtocol,
     cli_app: Any,
-    anncsu_security: Security,
+    anncsu_sdk: AnncsuConsultazione,
     geodiff: GeoDiffProtocol,
     wkb_loader: Any,
     logger: LoggerProtocol,
@@ -225,7 +225,7 @@ def process_entry(
         settings: Application settings
         cli_runner: CLI runner instance
         cli_app: ANNCSU CLI app
-        anncsu_security: Security instance for SDK calls with CLI token
+        anncsu_sdk: AnncsuConsultazione instance for SDK calls with CLI token
         geodiff: GeoDiff instance for geometry conversion
         wkb_loader: shapely.wkb.loads function
         logger: Logger for output
@@ -268,10 +268,8 @@ def process_entry(
         logger.info(f"{action} {len(entry.changes)} column values in {table} with PK: address_id={address_id}")
 
         # check if record exists in ANNCSU before deciding to insert or update
-        sdk = AnncsuConsultazione(security=anncsu_security)
-
         # get anncsu data basing on address_id
-        response = sdk.pathparam.prognazarea_get_path_param(prognaz=f"{address_id}")
+        response = anncsu_sdk.pathparam.prognazarea_get_path_param(prognaz=f"{address_id}")
         if response.res != "OK":
             logger.error(f"Failed to query ANNCSU for address_id={address_id}: {response.res} - {response.message}")
             return False
@@ -336,10 +334,10 @@ def process_all_entries(
     settings: SettingsProtocol,
     cli_runner: CliRunnerProtocol,
     cli_app: Any,
+    anncsu_sdk: AnncsuConsultazione,
     geodiff: GeoDiffProtocol,
     wkb_loader: Any,
     logger: LoggerProtocol,
-    anncsu_security: Security,
 ) -> list[EntryResult]:
     """Process all entries in a geodiff file.
 
@@ -348,12 +346,10 @@ def process_all_entries(
         settings: Application settings
         cli_runner: CLI runner instance
         cli_app: ANNCSU CLI app
-        anncsu_security: Security instance for SDK calls with CLI token
+        anncsu_sdk: AnncsuConsultazione instance for SDK calls with CLI token
         geodiff: GeoDiff instance
         wkb_loader: shapely.wkb.loads function
         logger: Logger for output
-        anncsu_security: Security instance for SDK calls with CLI token
-
     Returns:
         List of EntryResult objects
     """
@@ -364,7 +360,7 @@ def process_all_entries(
             settings=settings,
             cli_runner=cli_runner,
             cli_app=cli_app,
-            anncsu_security=anncsu_security,
+            anncsu_sdk=anncsu_sdk,
             geodiff=geodiff,
             wkb_loader=wkb_loader,
             logger=logger,
@@ -491,6 +487,7 @@ def run_action(
 
     # security class to use SDK calls with the same token as CLI
     anncsu_security = Security(bearer=token, validate_expiration=True)
+    sdk = AnncsuConsultazione(security=anncsu_security)
 
     # Process all entries
     logger.info("ANNCSU CLI update based on geodiff report JSON...")
@@ -499,10 +496,10 @@ def run_action(
         settings=settings,
         cli_runner=cli_runner,
         cli_app=cli_app,
+        anncsu_sdk=sdk,
         geodiff=geodiff,
         wkb_loader=wkb_loader,
         logger=logger,
-        anncsu_security=anncsu_security,
     )
 
     success = all(r.success for r in results)

@@ -159,15 +159,8 @@ class TestProcessEntry:
         mock_geodiff,
         mock_wkb_loader,
         mock_logger,
-        mock_anncsu_security,
-        monkeypatch,
+        mock_anncsu_consultazione,
     ):
-        # Mock the AnncsuConsultazione SDK
-        monkeypatch.setattr(
-            "main_with_cli.AnncsuConsultazione",
-            lambda security: MockAnncsuConsultazione(security),
-        )
-
         geodiff = GeodiffFile.from_json_text(geodiff_real_coord_update_json)
         entry = geodiff.geodiff[0]
 
@@ -176,7 +169,7 @@ class TestProcessEntry:
             settings=mock_settings,
             cli_runner=mock_cli_runner,
             cli_app=mock_cli_app,
-            anncsu_security=mock_anncsu_security,
+            anncsu_sdk=mock_anncsu_consultazione,
             geodiff=mock_geodiff,
             wkb_loader=mock_wkb_loader,
             logger=mock_logger,
@@ -199,20 +192,13 @@ class TestProcessEntry:
         mock_geodiff,
         mock_wkb_loader,
         mock_logger,
-        mock_anncsu_security,
-        monkeypatch,
     ):
         # Mock SDK with coordinates that don't match to force CLI call
-        mock_sdk = MockAnncsuConsultazione(security=mock_anncsu_security)
+        mock_sdk = MockAnncsuConsultazione()
         mock_sdk.pathparam.response = MockAnncsuResponse(
             res="OK",
             message="",
             data=[MockAnncsuRecord(coord_x=10.0, coord_y=50.0)],  # Different from mock_wkb_loader
-        )
-
-        monkeypatch.setattr(
-            "main_with_cli.AnncsuConsultazione",
-            lambda security: mock_sdk,
         )
 
         # Create CLI runner that returns failure
@@ -226,7 +212,7 @@ class TestProcessEntry:
             settings=mock_settings,
             cli_runner=cli_runner,
             cli_app=mock_cli_app,
-            anncsu_security=mock_anncsu_security,
+            anncsu_sdk=mock_sdk,
             geodiff=mock_geodiff,
             wkb_loader=mock_wkb_loader,
             logger=mock_logger,
@@ -246,7 +232,7 @@ class TestProcessEntry:
         mock_geodiff,
         mock_wkb_loader,
         mock_logger,
-        mock_anncsu_security,
+        mock_anncsu_consultazione,
     ):
         geodiff = GeodiffFile.from_json_text(geodiff_real_value_update_json)
         entry = geodiff.geodiff[0]
@@ -256,7 +242,7 @@ class TestProcessEntry:
             settings=mock_settings,
             cli_runner=mock_cli_runner,
             cli_app=mock_cli_app,
-            anncsu_security=mock_anncsu_security,
+            anncsu_sdk=mock_anncsu_consultazione,
             geodiff=mock_geodiff,
             wkb_loader=mock_wkb_loader,
             logger=mock_logger,
@@ -278,15 +264,8 @@ class TestProcessEntry:
         mock_geodiff,
         mock_wkb_loader,
         mock_logger,
-        mock_anncsu_security,
-        monkeypatch,
+        mock_anncsu_consultazione,
     ):
-        # Mock the AnncsuConsultazione SDK
-        monkeypatch.setattr(
-            "main_with_cli.AnncsuConsultazione",
-            lambda security: MockAnncsuConsultazione(security),
-        )
-
         geodiff = GeodiffFile.from_json_text(geodiff_insert_json)
         entry = geodiff.geodiff[0]
 
@@ -295,7 +274,7 @@ class TestProcessEntry:
             settings=mock_settings,
             cli_runner=mock_cli_runner,
             cli_app=mock_cli_app,
-            anncsu_security=mock_anncsu_security,
+            anncsu_sdk=mock_anncsu_consultazione,
             geodiff=mock_geodiff,
             wkb_loader=mock_wkb_loader,
             logger=mock_logger,
@@ -315,7 +294,7 @@ class TestProcessEntry:
         mock_geodiff,
         mock_wkb_loader,
         mock_logger,
-        mock_anncsu_security,
+        mock_anncsu_consultazione,
     ):
         geodiff = GeodiffFile.from_json_text(geodiff_delete_json)
         entry = geodiff.geodiff[0]
@@ -325,7 +304,7 @@ class TestProcessEntry:
             settings=mock_settings,
             cli_runner=mock_cli_runner,
             cli_app=mock_cli_app,
-            anncsu_security=mock_anncsu_security,
+            anncsu_sdk=mock_anncsu_consultazione,
             geodiff=mock_geodiff,
             wkb_loader=mock_wkb_loader,
             logger=mock_logger,
@@ -344,7 +323,7 @@ class TestProcessEntry:
         mock_cli_app,
         mock_geodiff,
         mock_logger,
-        mock_anncsu_security,
+        mock_anncsu_consultazione,
     ):
         # Create WKB loader that returns invalid geometry
         def bad_wkb_loader(data):
@@ -358,7 +337,7 @@ class TestProcessEntry:
             settings=mock_settings,
             cli_runner=mock_cli_runner,
             cli_app=mock_cli_app,
-            anncsu_security=mock_anncsu_security,
+            anncsu_sdk=mock_anncsu_consultazione,
             geodiff=mock_geodiff,
             wkb_loader=bad_wkb_loader,
             logger=mock_logger,
@@ -376,7 +355,7 @@ class TestProcessEntry:
         mock_cli_app,
         mock_geodiff,
         mock_logger,
-        mock_anncsu_security,
+        mock_anncsu_consultazione,
     ):
         # Create WKB loader that returns LineString geometry
         def linestring_wkb_loader(data):
@@ -390,7 +369,7 @@ class TestProcessEntry:
             settings=mock_settings,
             cli_runner=mock_cli_runner,
             cli_app=mock_cli_app,
-            anncsu_security=mock_anncsu_security,
+            anncsu_sdk=mock_anncsu_consultazione,
             geodiff=mock_geodiff,
             wkb_loader=linestring_wkb_loader,
             logger=mock_logger,
@@ -408,7 +387,7 @@ class TestProcessEntry:
         mock_geodiff,
         mock_wkb_loader,
         mock_logger,
-        mock_anncsu_security,
+        mock_anncsu_consultazione,
     ):
         # Create a mock entry with an unknown action type
         # We bypass Pydantic validation to test defensive code
@@ -427,7 +406,7 @@ class TestProcessEntry:
             settings=mock_settings,
             cli_runner=mock_cli_runner,
             cli_app=mock_cli_app,
-            anncsu_security=mock_anncsu_security,
+            anncsu_sdk=mock_anncsu_consultazione,
             geodiff=mock_geodiff,
             wkb_loader=mock_wkb_loader,
             logger=mock_logger,
@@ -447,18 +426,11 @@ class TestProcessEntry:
         mock_geodiff,
         mock_wkb_loader,
         mock_logger,
-        mock_anncsu_security,
-        monkeypatch,
     ):
         """Test when ANNCSU SDK returns no records for the address_id."""
         # Mock SDK that returns empty data
-        mock_sdk = MockAnncsuConsultazione(security=mock_anncsu_security)
+        mock_sdk = MockAnncsuConsultazione()
         mock_sdk.pathparam.response = MockAnncsuResponse(res="OK", message="", data=[])
-
-        monkeypatch.setattr(
-            "main_with_cli.AnncsuConsultazione",
-            lambda security: mock_sdk,
-        )
 
         geodiff = GeodiffFile.from_json_text(geodiff_real_coord_update_json)
         entry = geodiff.geodiff[0]
@@ -468,7 +440,7 @@ class TestProcessEntry:
             settings=mock_settings,
             cli_runner=mock_cli_runner,
             cli_app=mock_cli_app,
-            anncsu_security=mock_anncsu_security,
+            anncsu_sdk=mock_sdk,
             geodiff=mock_geodiff,
             wkb_loader=mock_wkb_loader,
             logger=mock_logger,
@@ -487,21 +459,14 @@ class TestProcessEntry:
         mock_geodiff,
         mock_wkb_loader,
         mock_logger,
-        mock_anncsu_security,
-        monkeypatch,
     ):
         """Test when ANNCSU SDK returns multiple records for the address_id."""
         # Mock SDK that returns multiple records
-        mock_sdk = MockAnncsuConsultazione(security=mock_anncsu_security)
+        mock_sdk = MockAnncsuConsultazione()
         mock_sdk.pathparam.response = MockAnncsuResponse(
             res="OK",
             message="",
             data=[MockAnncsuRecord(), MockAnncsuRecord()],
-        )
-
-        monkeypatch.setattr(
-            "main_with_cli.AnncsuConsultazione",
-            lambda security: mock_sdk,
         )
 
         geodiff = GeodiffFile.from_json_text(geodiff_real_coord_update_json)
@@ -512,7 +477,7 @@ class TestProcessEntry:
             settings=mock_settings,
             cli_runner=mock_cli_runner,
             cli_app=mock_cli_app,
-            anncsu_security=mock_anncsu_security,
+            anncsu_sdk=mock_sdk,
             geodiff=mock_geodiff,
             wkb_loader=mock_wkb_loader,
             logger=mock_logger,
@@ -531,21 +496,14 @@ class TestProcessEntry:
         mock_geodiff,
         mock_wkb_loader,
         mock_logger,
-        mock_anncsu_security,
-        monkeypatch,
     ):
         """Test when ANNCSU SDK query fails."""
         # Mock SDK that returns error response
-        mock_sdk = MockAnncsuConsultazione(security=mock_anncsu_security)
+        mock_sdk = MockAnncsuConsultazione()
         mock_sdk.pathparam.response = MockAnncsuResponse(
             res="ERROR",
             message="Database connection failed",
             data=[],
-        )
-
-        monkeypatch.setattr(
-            "main_with_cli.AnncsuConsultazione",
-            lambda security: mock_sdk,
         )
 
         geodiff = GeodiffFile.from_json_text(geodiff_real_coord_update_json)
@@ -556,7 +514,7 @@ class TestProcessEntry:
             settings=mock_settings,
             cli_runner=mock_cli_runner,
             cli_app=mock_cli_app,
-            anncsu_security=mock_anncsu_security,
+            anncsu_sdk=mock_sdk,
             geodiff=mock_geodiff,
             wkb_loader=mock_wkb_loader,
             logger=mock_logger,
@@ -575,22 +533,15 @@ class TestProcessEntry:
         mock_geodiff,
         mock_wkb_loader,
         mock_logger,
-        mock_anncsu_security,
-        monkeypatch,
     ):
         """Test when coordinates are within threshold - should skip update."""
         # Mock SDK that returns record with same coordinates
-        mock_sdk = MockAnncsuConsultazione(security=mock_anncsu_security)
+        mock_sdk = MockAnncsuConsultazione()
         # Set coordinates to exactly match what mock_wkb_loader returns
         mock_sdk.pathparam.response = MockAnncsuResponse(
             res="OK",
             message="",
             data=[MockAnncsuRecord(coord_x=12.34, coord_y=56.78, dug="R1AAAQAAAAABAQAAAAAAAICcwitAAAAAwInzREA=")],
-        )
-
-        monkeypatch.setattr(
-            "main_with_cli.AnncsuConsultazione",
-            lambda security: mock_sdk,
         )
 
         geodiff = GeodiffFile.from_json_text(geodiff_real_coord_update_json)
@@ -601,7 +552,7 @@ class TestProcessEntry:
             settings=mock_settings,
             cli_runner=mock_cli_runner,
             cli_app=mock_cli_app,
-            anncsu_security=mock_anncsu_security,
+            anncsu_sdk=mock_sdk,
             geodiff=mock_geodiff,
             wkb_loader=mock_wkb_loader,
             logger=mock_logger,
@@ -621,7 +572,7 @@ class TestProcessEntry:
         mock_geodiff,
         mock_wkb_loader,
         mock_logger,
-        mock_anncsu_security,
+        mock_anncsu_consultazione,
     ):
         """Test insert with negative address_id (new record without assigned ID)."""
         from types import SimpleNamespace
@@ -641,7 +592,7 @@ class TestProcessEntry:
             settings=mock_settings,
             cli_runner=mock_cli_runner,
             cli_app=mock_cli_app,
-            anncsu_security=mock_anncsu_security,
+            anncsu_sdk=mock_anncsu_consultazione,
             geodiff=mock_geodiff,
             wkb_loader=mock_wkb_loader,
             logger=mock_logger,
@@ -667,15 +618,8 @@ class TestProcessAllEntries:
         mock_geodiff,
         mock_wkb_loader,
         mock_logger,
-        mock_anncsu_security,
-        monkeypatch,
+        mock_anncsu_consultazione,
     ):
-        # Mock the AnncsuConsultazione SDK
-        monkeypatch.setattr(
-            "main_with_cli.AnncsuConsultazione",
-            lambda security: MockAnncsuConsultazione(security),
-        )
-
         geodiff = GeodiffFile.from_json_text(geodiff_multiple_entries_json)
 
         results = process_all_entries(
@@ -686,7 +630,7 @@ class TestProcessAllEntries:
             geodiff=mock_geodiff,
             wkb_loader=mock_wkb_loader,
             logger=mock_logger,
-            anncsu_security=mock_anncsu_security,
+            anncsu_sdk=mock_anncsu_consultazione,
         )
 
         assert len(results) == 3
@@ -704,7 +648,7 @@ class TestProcessAllEntries:
         mock_geodiff,
         mock_wkb_loader,
         mock_logger,
-        mock_anncsu_security,
+        mock_anncsu_consultazione,
     ):
         geodiff = GeodiffFile.from_json_text(geodiff_empty_json)
 
@@ -716,7 +660,7 @@ class TestProcessAllEntries:
             geodiff=mock_geodiff,
             wkb_loader=mock_wkb_loader,
             logger=mock_logger,
-            anncsu_security=mock_anncsu_security,
+            anncsu_sdk=mock_anncsu_consultazione,
         )
 
         assert len(results) == 0
@@ -728,20 +672,13 @@ class TestProcessAllEntries:
         mock_cli_app,
         mock_geodiff,
         mock_logger,
-        mock_anncsu_security,
-        monkeypatch,
     ):
         # Mock SDK with coordinates set to None to avoid dug parsing
-        mock_sdk = MockAnncsuConsultazione(security=mock_anncsu_security)
+        mock_sdk = MockAnncsuConsultazione()
         mock_sdk.pathparam.response = MockAnncsuResponse(
             res="OK",
             message="",
             data=[MockAnncsuRecord(coord_x=None, coord_y=None)],
-        )
-
-        monkeypatch.setattr(
-            "main_with_cli.AnncsuConsultazione",
-            lambda security: mock_sdk,
         )
 
         # CLI runner that fails on the second call (update operation)
@@ -772,7 +709,7 @@ class TestProcessAllEntries:
             geodiff=mock_geodiff,
             wkb_loader=selective_wkb_loader,
             logger=mock_logger,
-            anncsu_security=mock_anncsu_security,
+            anncsu_sdk=mock_sdk,
         )
 
         assert len(results) == 3
