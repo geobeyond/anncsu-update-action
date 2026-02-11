@@ -6,7 +6,7 @@ branding:
   color: "blue"
 
 inputs:
-  geodiff-report:
+  geodiff_report:
     description: "Path to the Geodiff report file."
     required: true
   token:
