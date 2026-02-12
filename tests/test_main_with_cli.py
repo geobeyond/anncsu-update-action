@@ -762,6 +762,60 @@ class TestLoadGeodiffReport:
         error_messages = [msg for level, msg in mock_logger.messages if level == "error"]
         assert any("Failed to parse" in msg for msg in error_messages)
 
+    def test_load_geodiff_action_report_from_file(self, tmp_path, geodiff_action_report_json, mock_logger):
+        """Test loading a geodiff-action report file with header."""
+        report_file = tmp_path / "action_report.json"
+        report_file.write_text(geodiff_action_report_json)
+
+        result = load_geodiff_report(str(report_file), mock_logger)
+
+        assert result is not None
+        assert len(result.geodiff) == 2
+        assert result.geodiff[0].type == "update"
+        assert result.geodiff[1].type == "insert"
+        # Verify the header was detected
+        info_messages = [msg for level, msg in mock_logger.messages if level == "info"]
+        assert any("Geodiff-action report file detected" in msg for msg in info_messages)
+
+    def test_load_geodiff_action_report_from_json_text(self, geodiff_action_report_json, mock_logger):
+        """Test loading geodiff-action report as JSON text (should fail and fall back)."""
+        # When passed as JSON text (not a file), it should try to parse directly
+        # The geodiff-action format is only detected when reading from a file
+        result = load_geodiff_report(geodiff_action_report_json, mock_logger)
+
+        # Should fail because the JSON text has the wrong structure for direct parsing
+        assert result is None
+
+    def test_load_geodiff_action_report_missing_changes_key(self, tmp_path, mock_logger):
+        """Test geodiff-action report file with missing 'changes' key."""
+        import json
+
+        report_content = {"has_changes": True, "summary": {"insert": 0}}
+        report_file = tmp_path / "incomplete_action_report.json"
+        report_file.write_text(json.dumps(report_content))
+
+        result = load_geodiff_report(str(report_file), mock_logger)
+
+        # Should fail to parse as geodiff-action format and fall back to standard parsing
+        assert result is None
+
+    def test_load_geodiff_action_report_no_changes(self, tmp_path, mock_logger):
+        """Test geodiff-action report with has_changes=False."""
+        import json
+
+        report_content = {
+            "has_changes": False,
+            "summary": {"insert": 0, "update": 0, "delete": 0},
+            "changes": {"geodiff": []},
+        }
+        report_file = tmp_path / "no_changes_report.json"
+        report_file.write_text(json.dumps(report_content))
+
+        result = load_geodiff_report(str(report_file), mock_logger)
+
+        assert result is not None
+        assert len(result.geodiff) == 0
+
 
 # ============================================================================
 # Tests for authenticate_cli function

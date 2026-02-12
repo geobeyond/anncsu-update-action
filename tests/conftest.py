@@ -424,6 +424,45 @@ def geodiff_empty_json():
     return json.dumps({"geodiff": []})
 
 
+@pytest.fixture
+def geodiff_action_report_json():
+    """Geodiff-action report format with header (has_changes, summary, changes)."""
+    return json.dumps(
+        {
+            "base_file": "a_previous.gpkg",
+            "compare_file": "a_current.gpkg",
+            "has_changes": True,
+            "summary": {
+                "insert": 1,
+                "update": 1,
+                "delete": 0,
+            },
+            "changes": {
+                "geodiff": [
+                    {
+                        "table": "addresses",
+                        "type": "update",
+                        "changes": [
+                            {"column": 0, "old": 1001},
+                            {"column": 1, "new": "R1AAAQAAAAABAQAAAAAAAICcwitAAAAAwInzREA="},
+                            {"column": 2, "old": 5001},
+                        ],
+                    },
+                    {
+                        "table": "addresses",
+                        "type": "insert",
+                        "changes": [
+                            {"column": 0, "new": 1002},
+                            {"column": 1, "new": "R1AAAeYQAAABAQAAAFyu1BOp6um/PoMqH8N01j8="},
+                            {"column": 2, "new": 5002},
+                        ],
+                    },
+                ]
+            },
+        }
+    )
+
+
 # ============================================================================
 # Fixtures - Geodiff Report Files (for integration tests)
 # ============================================================================
