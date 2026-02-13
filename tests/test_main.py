@@ -63,10 +63,10 @@ class TestMain:
 
         assert exc_info.value.code == 1
 
-        # Check that set_failed was called
-        core = mock_imports["core"]
-        assert core.failed_message is not None
-        assert "Failed to load Anncsu Update Settings" in core.failed_message
+        # Check that the original exception is preserved in the chain
+        assert exc_info.value.__cause__ is not None
+        assert isinstance(exc_info.value.__cause__, ValueError)
+        assert str(exc_info.value.__cause__) == "Invalid settings"
 
     def test_main_gets_required_inputs(self, mock_imports, mock_run_action_success):
         """Test main() retrieves required inputs from core.get_input."""
@@ -300,9 +300,9 @@ class TestMainEdgeCases:
 
         assert exc_info.value.code == 1
 
-        core = mock_imports["core"]
-        assert "Failed to load Anncsu Update Settings" in core.failed_message
-        assert "codice_comune is required" in core.failed_message
+        # Check that the original exception is preserved in the chain        assert exc_info.value.__cause__ is not None
+        assert isinstance(exc_info.value.__cause__, ValueError)
+        assert str(exc_info.value.__cause__) == "codice_comune is required"
 
     def test_main_preserves_exception_chain(self, mock_imports, monkeypatch):
         """Test main() preserves the exception chain when re-raising."""
@@ -318,9 +318,10 @@ class TestMainEdgeCases:
         # SystemExit should be raised
         assert exc_info.value.code == 1
 
-        # The original exception should be preserved in failed_message
-        core = mock_imports["core"]
-        assert "Original error" in core.failed_message
+        # Check that the original exception is preserved in the chain
+        assert exc_info.value.__cause__ is not None
+        assert isinstance(exc_info.value.__cause__, RuntimeError)
+        assert str(exc_info.value.__cause__) == "Original error"
 
     def test_main_with_different_api_type(self, mock_imports, monkeypatch):
         """Test main() uses 'pa' as the api_type parameter."""

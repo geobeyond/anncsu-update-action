@@ -501,12 +501,12 @@ def run_action(
     # Load geodiff report
     geodiff_obj = load_geodiff_report(geodiff_report, logger)
     if geodiff_obj is None:
-        logger.set_failed("Could not load or validate geodiff report; aborting")
+        logger.error("Could not load or validate geodiff report; aborting")
         return False
 
     # Authenticate with CLI
     if not authenticate_cli(cli_runner, cli_app, api_type, logger):
-        logger.set_failed("Failed to authenticate with ANNCSU CLI")
+        logger.error("Failed to authenticate with ANNCSU CLI")
         return False
 
     # security class to use SDK calls with the same token as CLI
@@ -576,8 +576,9 @@ def main() -> None:
         settings = AnncsuUpdateSettings()
         core.debug(f"Loaded settings: {settings.model_dump_json()}")
     except Exception as exc:
-        core.set_failed(f"Failed to load Anncsu Update Settings: {exc}")
+        core.error(f"Failed to load Anncsu Update Settings: {exc}")
         raise SystemExit(1) from exc
+        # core.set_failed(f"Failed to load Anncsu Update Settings: {exc}")
 
     # Create CLI runner
     cli_runner = CliRunner()
@@ -598,6 +599,7 @@ def main() -> None:
     if success:
         print("\033[32;1mAnncsu Update Action completed successfully\033[0m")
     else:
+        core.error("\033[31;1mAnncsu Update Action failed. Check logs for details.\033[0m")
         raise SystemExit(1)
 
 

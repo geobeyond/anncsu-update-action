@@ -890,7 +890,6 @@ class TestRunAction:
         )
 
         assert result is True
-        assert mock_logger.failed_message is None
         # Should have auth + update calls
         assert len(mock_cli_runner.invocations) >= 2
 
@@ -915,8 +914,10 @@ class TestRunAction:
         )
 
         assert result is False
-        assert mock_logger.failed_message is not None
-        assert "geodiff report" in mock_logger.failed_message.lower()
+        # Verify error was logged
+        error_messages = [msg for level, msg in mock_logger.messages if level == "error"]
+        assert len(error_messages) > 0
+        assert any("geodiff report" in msg.lower() for msg in error_messages)
 
     def test_run_action_auth_failure(
         self,
@@ -941,8 +942,10 @@ class TestRunAction:
         )
 
         assert result is False
-        assert mock_logger.failed_message is not None
-        assert "authenticate" in mock_logger.failed_message.lower()
+        # Verify error was logged
+        error_messages = [msg for level, msg in mock_logger.messages if level == "error"]
+        assert len(error_messages) > 0
+        assert any("authenticate" in msg.lower() for msg in error_messages)
 
     def test_run_action_partial_entry_failure(
         self,

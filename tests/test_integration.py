@@ -396,7 +396,9 @@ class TestErrorScenariosIntegration:
         )
 
         assert result is False
-        assert mock_logger.failed_message is not None
+        # Verify error was logged
+        error_messages = [msg for level, msg in mock_logger.messages if level == "error"]
+        assert len(error_messages) > 0
 
     def test_run_action_with_valid_json_invalid_schema(
         self, tmp_path, mock_settings, mock_cli_runner, mock_cli_app, mock_geodiff, mock_logger
@@ -420,7 +422,9 @@ class TestErrorScenariosIntegration:
         )
 
         assert result is False
-        assert mock_logger.failed_message is not None
+        # Verify error was logged
+        error_messages = [msg for level, msg in mock_logger.messages if level == "error"]
+        assert len(error_messages) > 0
 
     def test_run_action_with_empty_geodiff_file(
         self, tmp_path, mock_settings, mock_cli_runner, mock_cli_app, mock_geodiff, mock_logger
