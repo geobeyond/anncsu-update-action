@@ -697,6 +697,199 @@ def base_geopackage(tmp_path):
 
 
 # ============================================================================
+# Mock Classes for main() Function Testing
+# ============================================================================
+
+
+class MockCoreForMain:
+    """Mock for actions.core module used in main() tests."""
+
+    def __init__(self):
+        self.messages = []
+        self.failed_message = None
+        self.version = "1.0.0-test"
+
+    def get_version(self) -> str:
+        return self.version
+
+    def info(self, message: str) -> None:
+        self.messages.append(("info", message))
+
+    def debug(self, message: str) -> None:
+        self.messages.append(("debug", message))
+
+    def warn(self, message: str) -> None:
+        self.messages.append(("warn", message))
+
+    def error(self, message: str) -> None:
+        self.messages.append(("error", message))
+
+    def set_failed(self, message: str) -> None:
+        self.failed_message = message
+
+    def group(self, name: str) -> Any:
+        @contextmanager
+        def _cm():
+            yield None
+
+        return _cm()
+
+    def get_input(self, name: str, required: bool = False) -> str:
+        if name == "geodiff_report":
+            return "/fake/geodiff_report.json"
+        if name == "token":
+            return "fake-token"
+        return ""
+
+
+class MockContextForMain:
+    """Mock for actions.context module used in main() tests."""
+
+    repo = {"name": "test-repo", "owner": "test-owner"}
+    sha = "abc123"
+    ref = "refs/heads/main"
+    os = object()  # Mock os object that will be deleted in main()
+
+
+class MockFunctionsForMain:
+    """Mock for functions module used in main() tests."""
+
+    @staticmethod
+    def check_output(cmd: str, raise_on_error: bool) -> str:
+        return "Mock output"
+
+
+class MockSettingsForMain:
+    """Mock settings class for main() tests."""
+
+    def __init__(self):
+        self.codice_comune = "I501"
+        self.coordinate_distance_threshold = 0.001
+
+    def model_dump_json(self) -> str:
+        return '{"codice_comune": "I501", "coordinate_distance_threshold": 0.001}'
+
+
+class MockCliRunnerForMain:
+    """Mock Typer CLI runner for main() tests."""
+
+    def invoke(self, app: Any, args: list[str]) -> Any:
+        return SimpleNamespace(exit_code=0, output="OK")
+
+
+class MockGeoDiffForMain:
+    """Mock pygeodiff.GeoDiff class for main() tests."""
+
+    def create_wkb_from_gpkg_header(self, data: bytes) -> list[bytes]:
+        return [b"FAKE-WKB"]
+
+
+class MockGeometryForMain:
+    """Mock shapely geometry for main() tests."""
+
+    is_valid = True
+    geom_type = "Point"
+
+    @property
+    def coords(self):
+        return [(12.34, 56.78)]
+
+
+def mock_wkb_loads_for_main(data: bytes) -> MockGeometryForMain:
+    """Mock shapely.wkb.loads function for main() tests."""
+    return MockGeometryForMain()
+
+
+# ============================================================================
+# Fixtures for main() Function Testing
+# ============================================================================
+
+
+@pytest.fixture
+def mock_imports(monkeypatch):
+    """Mock all runtime imports in the main() function.
+
+    This fixture patches the imports that happen inside main():
+    - typer.testing.CliRunner
+    - shapely.wkb
+    - pygeodiff.GeoDiff
+    - actions.context and core
+    - functions
+    - settings.AnncsuUpdateSettings
+    - anncsu.cli.app
+    """
+    import sys
+    import types
+
+    # Create mock modules
+    mock_typer_testing = types.ModuleType("typer.testing")
+    mock_typer_testing.CliRunner = MockCliRunnerForMain
+
+    mock_shapely_wkb = types.ModuleType("shapely.wkb")
+    mock_shapely_wkb.loads = mock_wkb_loads_for_main
+
+    mock_pygeodiff = types.ModuleType("pygeodiff")
+    mock_pygeodiff.GeoDiff = MockGeoDiffForMain
+
+    mock_actions = types.ModuleType("actions")
+    mock_actions.core = MockCoreForMain()
+
+    # Create context as a module-like object with proper attributes
+    mock_context = types.SimpleNamespace()
+    mock_context.repo = {"name": "test-repo", "owner": "test-owner"}
+    mock_context.sha = "abc123"
+    mock_context.ref = "refs/heads/main"
+    mock_context.os = object()  # Will be deleted by main()
+    mock_actions.context = mock_context
+
+    mock_functions = MockFunctionsForMain()
+
+    mock_settings_module = types.ModuleType("settings")
+    mock_settings_module.AnncsuUpdateSettings = MockSettingsForMain
+
+    mock_anncsu_cli = types.ModuleType("anncsu.cli")
+    mock_anncsu_cli.app = SimpleNamespace(name="mock-anncsu-cli")
+
+    # Patch sys.modules to inject our mocks
+    monkeypatch.setitem(sys.modules, "typer.testing", mock_typer_testing)
+    monkeypatch.setitem(sys.modules, "shapely.wkb", mock_shapely_wkb)
+    monkeypatch.setitem(sys.modules, "pygeodiff", mock_pygeodiff)
+    monkeypatch.setitem(sys.modules, "actions", mock_actions)
+    monkeypatch.setitem(sys.modules, "functions", mock_functions)
+    monkeypatch.setitem(sys.modules, "settings", mock_settings_module)
+    monkeypatch.setitem(sys.modules, "anncsu.cli", mock_anncsu_cli)
+    monkeypatch.setitem(sys.modules, "anncsu", types.ModuleType("anncsu"))
+
+    return {
+        "core": mock_actions.core,
+        "context": mock_actions.context,
+        "functions": mock_functions,
+        "settings": mock_settings_module,
+        "cli_app": mock_anncsu_cli.app,
+    }
+
+
+@pytest.fixture
+def mock_run_action_success(monkeypatch):
+    """Mock run_action to return True (success)."""
+
+    def mock_run_action(*args, **kwargs):
+        return True
+
+    monkeypatch.setattr("main_with_cli.run_action", mock_run_action)
+
+
+@pytest.fixture
+def mock_run_action_failure(monkeypatch):
+    """Mock run_action to return False (failure)."""
+
+    def mock_run_action(*args, **kwargs):
+        return False
+
+    monkeypatch.setattr("main_with_cli.run_action", mock_run_action)
+
+
+# ============================================================================
 # Legacy Fixtures (for backward compatibility during transition)
 # ============================================================================
 
